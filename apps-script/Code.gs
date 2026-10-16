@@ -1,5 +1,5 @@
 /**
- * Alta de clientes Corti-Fer — servidor en Google Apps Script.  Versión 3 (2026-10-16)
+ * Alta de clientes Corti-Fer — servidor en Google Apps Script.  Versión 3.2 (2026-10-16)
  *
  * - Base de datos: hoja "Solicitudes" de la planilla vinculada a este script.
  * - Adjuntos: una subcarpeta de Drive por solicitud.
@@ -7,9 +7,11 @@
  *
  * Reglas de negocio:
  * - Un mismo envío (ID de envío) se guarda UNA sola vez aunque el navegador reintente.
- * - Un CUIT que ya está "Dada de alta" no puede volver a solicitar alta ni volver a darse de alta.
- * - Un CUIT con una solicitud abierta ("Nueva" o "En revisión") no puede cargar otra.
- * - El número de cliente es obligatorio para dar de alta y no puede repetirse.
+ * - El CUIT PUEDE repetirse (un cliente con varias sucursales tiene un número de cliente por sucursal):
+ *   no se bloquea, se AVISA al cliente, a administración (email y panel) y se anota en la planilla.
+ * - También se avisa cuando el número es de persona física (CUIL / CUIT de persona: prefijos 20-27).
+ * - El número de cliente es obligatorio para dar de alta y NO puede repetirse.
+ * - El nombre y apellido del vendedor / viajante es obligatorio.
  *
  * Propiedades del script (Configuración del proyecto > Propiedades del script). setup() crea las que faltan:
  *   ADMIN_KEY        clave del panel de administración
@@ -19,7 +21,7 @@
  *   SEND_RECEIPT     "si" / "no": acuse de recibo al cliente
  */
 
-const API_VERSION = '3.0';
+const API_VERSION = '3.2';
 
 const CONF = {
   SHEET_NAME: 'Solicitudes',
@@ -33,6 +35,7 @@ const CONF = {
   MIMES: ['application/pdf', 'image/jpeg', 'image/png'],
   ESTADOS: ['Nueva', 'En revisión', 'Dada de alta', 'Rechazada'],
   ABIERTOS: ['Nueva', 'En revisión'],
+  PERSONA: ['20', '23', '24', '25', '26', '27'],   // prefijos de persona física (CUIL / CUIT personal)
   NRO_CLIENTE_RE: /^[A-Z0-9][A-Z0-9\-\/.]{0,19}$/,
   LOCK_MS: 20000,
   MAX_AUTH_FAILS: 10 // intentos fallidos de clave antes de bloquear 15 minutos
@@ -43,7 +46,7 @@ const CONF = {
 const COLS = (function () {
   const c = [
     ['nro', 'Nro solicitud'], ['fecha', 'Fecha'], ['estado', 'Estado'],
-    ['razon', 'Razón social'], ['fantasia', 'Nombre de fantasía'], ['cuit', 'CUIT'], ['email', 'Email'],
+    ['razon', 'Razón social'], ['fantasia', 'Nombre de fantasía'], ['cuit', 'CUIT'], ['email', 'Email'], ['vendedor', 'Vendedor / viajante'],
     ['movil', 'Teléfono móvil'], ['otroTel', 'Otro teléfono'],
     ['domCalle', 'Legal - Calle y número'], ['domCiudad', 'Legal - Ciudad'], ['domProv', 'Legal - Provincia'], ['domCP', 'Legal - CP'],
     ['mismoDom', 'Entrega en domicilio legal'],
@@ -57,7 +60,7 @@ const COLS = (function () {
     ['cm05', 'Formulario CM05'], ['f1276', 'Formulario 1276'], ['exencion', 'Certificado de exención'], ['carpeta', 'Carpeta Drive'],
     ['duplicado', 'Otras solicitudes mismo CUIT'], ['obs', 'Observaciones'],
     ['fechaAlta', 'Fecha de alta'], ['nroCliente', 'Número de cliente'], ['notificado', 'Email de alta enviado'],
-    ['historialEmails', 'Historial de notificaciones'], ['reqId', 'ID de envío']
+    ['historialEmails', 'Historial de notificaciones'], ['reqId', 'ID de envío'], ['tipoCuit', 'Tipo de CUIT']
   );
   return c;
 })();
@@ -122,19 +125,14 @@ function submit_(body) {
       if (prev) { nro = prev.nro; return; }
     }
 
-    // 2) Un CUIT, una cuenta.
-    const same = T.recs.filter(function (r) { return r.cuit === d.cuit; });
-    const alta = same.filter(function (r) { return r.estado === 'Dada de alta'; })[0];
-    if (alta) fail_('Este CUIT ya es cliente de ' + CONF.EMPRESA + '. Para comprar en la web creá tu usuario en el enlace de registración.', 'CUIT_CLIENTE', { url: CONF.URL_REGISTRO });
-    const abierta = same.filter(function (r) { return CONF.ABIERTOS.indexOf(r.estado) >= 0; })[0];
-    if (abierta) fail_('Ya tenemos una solicitud en curso para este CUIT (' + abierta.nro + '). Administración se va a comunicar con vos.', 'CUIT_EN_CURSO', { nro: abierta.nro });
-    dup = same.map(function (r) { return r.nro + ' (' + r.estado + ')'; }).join(', ');
+    // 2) CUIT repetido: se permite (sucursales), pero queda anotado para avisar.
+    dup = describeSame_(T.recs.filter(function (r) { return r.cuit === d.cuit; }));
 
     // 3) Número correlativo: nunca repite, aunque se borre la propiedad o se copie el proyecto.
     nro = nextNro_(T.recs);
 
     const rec = Object.assign({}, d, {
-      nro: nro, fecha: now_(), estado: 'Nueva', reqId: reqId,
+      nro: nro, fecha: now_(), estado: 'Nueva', reqId: reqId, tipoCuit: tipoCuit_(d.cuit),
       mismoDom: d.mismoDom ? 'Sí' : 'No', duplicado: dup
     });
     rowIndex = appendRecord_(T, rec);
@@ -156,22 +154,31 @@ function submit_(body) {
     try { updateByNro_(nro, extra); } catch (err) { console.error('Guardar links ' + nro + ': ' + err); }
   }
 
-  try { mailAdmin_(Object.assign({}, d, extra, { nro: nro, duplicado: dup })); } catch (err) { console.error('Mail admin ' + nro + ': ' + err); }
+  try { mailAdmin_(Object.assign({}, d, extra, { nro: nro, duplicado: dup, tipoCuit: tipoCuit_(d.cuit) })); } catch (err) { console.error('Mail admin ' + nro + ': ' + err); }
   if (String(prop_('SEND_RECEIPT') || 'si').toLowerCase() !== 'no') {
     try { mailReceipt_(d, nro); } catch (err) { console.error('Mail acuse ' + nro + ': ' + err); }
   }
   return { ok: true, nro: nro };
 }
 
-/* Consulta rápida desde el formulario: ¿este CUIT ya es cliente o tiene una solicitud abierta? */
+/* Consulta rápida desde el formulario: ¿este CUIT ya está registrado? ¿es de persona física?
+   Solo informa: no bloquea nada (un cliente puede sumar sucursales con el mismo CUIT). */
 function checkCuit_(cuit) {
   cuit = String(cuit || '').replace(/\D/g, '');
   if (!cuitOk_(cuit)) return { ok: true, estado: 'invalido' };
-  const recs = table_().recs.filter(function (r) { return r.cuit === cuit; });
-  if (recs.some(function (r) { return r.estado === 'Dada de alta'; })) return { ok: true, estado: 'cliente', url: CONF.URL_REGISTRO };
-  const ab = recs.filter(function (r) { return CONF.ABIERTOS.indexOf(r.estado) >= 0; })[0];
-  if (ab) return { ok: true, estado: 'en_curso', nro: ab.nro };
-  return { ok: true, estado: 'libre' };
+  const recs = table_().recs.filter(function (r) { return r.cuit === cuit && r.estado !== 'Rechazada'; });
+  const out = { ok: true, tipo: tipoCuit_(cuit), estado: 'libre' };
+  if (recs.some(function (r) { return r.estado === 'Dada de alta'; })) out.estado = 'cliente';
+  else if (recs.length) out.estado = 'en_curso';
+  return out;
+}
+
+/* "Persona física (CUIL)" para prefijos 20–27, "Empresa" para 30/33/34. */
+function tipoCuit_(cuit) { return CONF.PERSONA.indexOf(String(cuit).slice(0, 2)) >= 0 ? 'Persona física (CUIL)' : 'Empresa'; }
+
+/* Texto para la columna "Otras solicitudes mismo CUIT": nro, estado y número de cliente. */
+function describeSame_(recs) {
+  return recs.map(function (r) { return r.nro + ' (' + r.estado + (r.nroCliente ? ', cliente ' + r.nroCliente : '') + ')'; }).join(', ');
 }
 
 function nextNro_(recs) {
@@ -237,10 +244,6 @@ function setEstado_(nro, estado) {
     const T = table_();
     const f = findIn_(T, nro);
     if (f.rec.estado === 'Dada de alta') fail_('La solicitud ya está dada de alta.', 'STATE');
-    if (CONF.ABIERTOS.indexOf(estado) >= 0 && f.rec.estado === 'Rechazada') {
-      const otra = T.recs.filter(function (r) { return r.nro !== f.rec.nro && r.cuit === f.rec.cuit && (r.estado === 'Dada de alta' || CONF.ABIERTOS.indexOf(r.estado) >= 0); })[0];
-      if (otra) fail_('No se puede reabrir: el CUIT tiene otra solicitud ' + otra.nro + ' (' + otra.estado + ').', 'CUIT_DUP');
-    }
     return { ok: true, item: publicRecord_(writeRec_(T, f, { estado: estado })) };
   });
 }
@@ -267,10 +270,10 @@ function approve_(nro, nroCliente, force) {
     if (!nroCliente) fail_('Ingresá el número de cliente.', 'CLIENT_NUMBER');
     if (!CONF.NRO_CLIENTE_RE.test(nroCliente)) fail_('Número de cliente no válido: usá solo números o letras (hasta 20).', 'CLIENT_NUMBER');
 
+    // El CUIT puede repetirse (sucursales); el número de cliente, nunca.
     T.recs.forEach(function (o) {
       if (o.nro === r.nro) return;
       if (o.nroCliente && normNroCliente_(o.nroCliente) === nroCliente) fail_('El número de cliente ' + nroCliente + ' ya está asignado a ' + o.razon + ' (' + o.nro + ').', 'CLIENT_NUMBER_DUP');
-      if (o.cuit === r.cuit && o.estado === 'Dada de alta') fail_('Este CUIT ya fue dado de alta en la solicitud ' + o.nro + '. No se puede dar de alta dos veces.', 'CUIT_ALTA');
     });
 
     const hist = (r.historialEmails ? r.historialEmails + '\n' : '') + now_() + ' · envío a ' + r.email + ' (cliente ' + nroCliente + ')';
@@ -302,20 +305,23 @@ function mailAdmin_(r) {
   const adj = [['cm05', 'CM05'], ['f1276', 'Formulario 1276'], ['exencion', 'Exención']]
     .filter(function (x) { return r[x[0]]; }).map(function (x) { return x[1]; }).join(', ') || 'Ninguno';
   const rows = [
-    ['Razón social', r.razon], ['Nombre de fantasía', r.fantasia], ['CUIT', fmtCuit_(r.cuit)], ['Email', r.email],
+    ['Razón social', r.razon], ['Nombre de fantasía', r.fantasia], ['CUIT', fmtCuit_(r.cuit) + ' · ' + r.tipoCuit], ['Email', r.email],
+    ['Vendedor / viajante', r.vendedor],
     ['Teléfono', r.movil], ['Localidad', r.domCiudad + ', ' + r.domProv], ['Condición IVA', r.iva],
     ['Convenio Multilateral', r.convenio], ['Adjuntos', adj]
   ];
   let html = '<p>Entró una nueva solicitud de alta de cliente: <b>' + h_(r.nro) + '</b>.</p>' + tableHtml_(rows);
-  if (r.duplicado) html += '<p style="color:#8A5700"><b>Atención:</b> este CUIT tiene solicitudes anteriores: ' + h_(r.duplicado) + '.</p>';
+  if (r.duplicado) html += '<p style="color:#8A5700;background:#FDF1D8;padding:10px 12px;border-radius:6px"><b>CUIT repetido:</b> ya figura en ' + h_(r.duplicado) + '. Si es otra sucursal, asignale un número de cliente distinto.</p>';
+  if (r.tipoCuit && r.tipoCuit.indexOf('Persona') === 0) html += '<p style="color:#8A5700;background:#FDF1D8;padding:10px 12px;border-radius:6px"><b>CUIL / persona física:</b> el número empieza con ' + h_(r.cuit.slice(0, 2)) + '. Verificá que sea el CUIT con el que factura.</p>';
   if (link) html += button_(link, 'Abrir en el panel');
   MailApp.sendEmail({
     to: to,
     replyTo: r.email,
     name: CONF.EMPRESA + ' · Altas',
-    subject: 'Nueva solicitud de alta: ' + r.razon + ' (' + r.nro + ')',
+    subject: (r.duplicado ? '[CUIT repetido] ' : '') + 'Nueva solicitud de alta: ' + r.razon + ' (' + r.nro + ')',
     htmlBody: wrap_(html),
-    body: 'Nueva solicitud de alta ' + r.nro + '\n' + rows.map(function (x) { return x[0] + ': ' + x[1]; }).join('\n') + (link ? '\n\nPanel: ' + link : '')
+    body: 'Nueva solicitud de alta ' + r.nro + '\n' + rows.map(function (x) { return x[0] + ': ' + x[1]; }).join('\n') +
+      (r.duplicado ? '\n\nCUIT REPETIDO: ya figura en ' + r.duplicado : '') + (link ? '\n\nPanel: ' + link : '')
   });
 }
 
@@ -336,7 +342,7 @@ function mailAlta_(r) {
   const nombre = r.fantasia || r.razon;
   const html = '<p>Hola <b>' + h_(nombre) + '</b>,</p>' +
     '<p>¡Tu cuenta de cliente en ' + CONF.EMPRESA + ' ya está dada de alta!</p>' +
-    tableHtml_([['Número de cliente', r.nroCliente], ['CUIT', fmtCuit_(r.cuit)], ['Razón social', r.razon]]) +
+    tableHtml_([['Número de cliente', r.nroCliente], ['CUIT', fmtCuit_(r.cuit)], ['Razón social', r.razon]].concat(r.vendedor ? [['Tu vendedor', r.vendedor]] : [])) +
     '<p>Para ver precios y hacer pedidos, creá tu usuario en nuestra web con estos datos y este mismo email:</p>' +
     button_(CONF.URL_REGISTRO, 'Crear mi cuenta') +
     '<p style="font-size:13px;color:#555">Si el botón no funciona, copiá este enlace en el navegador:<br>' + h_(CONF.URL_REGISTRO) + '</p>' +
@@ -377,7 +383,7 @@ function normalize_(D) {
   const m = D.mismoDom === true || D.mismoDom === 'Sí';
   const o = {
     razon: up(D.razon), fantasia: tr(D.fantasia), cuit: String(D.cuit || '').replace(/\D/g, ''),
-    email: tr(D.email).toLowerCase(), movil: ph(D.movil), otroTel: ph(D.otroTel),
+    email: tr(D.email).toLowerCase(), vendedor: nombre_(D.vendedor), movil: ph(D.movil), otroTel: ph(D.otroTel),
     domCalle: up(D.domCalle), domCiudad: up(D.domCiudad), domProv: tr(D.domProv), domCP: up(D.domCP),
     mismoDom: m,
     entCalle: up(m ? D.domCalle : D.entCalle), entCiudad: up(m ? D.domCiudad : D.entCiudad),
@@ -398,6 +404,7 @@ function validate_(d) {
   if (!d.razon) e.push('razón social');
   if (!cuitOk_(d.cuit)) e.push('CUIT');
   if (!isMail_(d.email)) e.push('email');
+  if (!nombreOk_(d.vendedor)) e.push('nombre y apellido del vendedor / viajante');
   if (d.movil.length !== 10) e.push('teléfono móvil');
   if (!d.domCalle || !d.domCiudad || !d.domProv || !cp(d.domCP)) e.push('domicilio legal');
   if (!d.mismoDom && (!d.entCalle || !d.entCiudad || !d.entProv || !cp(d.entCP))) e.push('domicilio de entrega');
@@ -420,6 +427,16 @@ function cuitOk_(s) {
   let dv = 11 - (t % 11);
   if (dv === 11) dv = 0;
   return dv !== 10 && dv === Number(s[10]);
+}
+/* Nombre y apellido: espacios normalizados y Mayúscula Inicial ("juan  PEREZ" → "Juan Perez"). */
+function nombre_(v) {
+  return String(v || '').replace(/\s+/g, ' ').trim().slice(0, 80).toLowerCase()
+    .replace(/(^|[\s'-])([a-záéíóúüñ])/g, function (m, a, b) { return a + b.toUpperCase(); });
+}
+/* Al menos dos palabras de 2+ letras, solo letras, espacios, apóstrofo, punto o guion. */
+function nombreOk_(v) {
+  v = String(v || '');
+  return /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .\-]+$/.test(v) && v.split(' ').filter(function (w) { return w.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, '').length >= 2; }).length >= 2;
 }
 function isMail_(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v || '')); }
 function fmtCuit_(s) { s = String(s || ''); return s.length === 11 ? s.slice(0, 2) + '-' + s.slice(2, 10) + '-' + s.slice(10) : s; }
@@ -558,6 +575,7 @@ function setup() {
   if (!P.getProperty('DRIVE_FOLDER_ID')) P.setProperty('DRIVE_FOLDER_ID', DriveApp.createFolder('Altas de clientes - documentación').getId());
   if (!P.getProperty('ADMIN_URL')) P.setProperty('ADMIN_URL', '');
 
+  completarTipoCuit_();
   const dups = revisarDuplicados();
   Logger.log('Listo. Versión ' + API_VERSION + '. Hoja: ' + CONF.SHEET_NAME);
   Logger.log('Clave de administración: ' + P.getProperty('ADMIN_KEY'));
@@ -565,7 +583,14 @@ function setup() {
   Logger.log('Carpeta de adjuntos: https://drive.google.com/drive/folders/' + P.getProperty('DRIVE_FOLDER_ID'));
   if (!P.getProperty('ADMIN_URL')) Logger.log('Falta completar ADMIN_URL con la URL del panel en GitHub Pages.');
   Logger.log('Cupo de emails restante hoy: ' + MailApp.getRemainingDailyQuota());
-  if (dups) Logger.log('ATENCIÓN: hay datos duplicados en la planilla, ver arriba.');
+  if (dups) Logger.log('ATENCIÓN: hay números de solicitud o de cliente repetidos, ver arriba.');
+}
+
+/* Completa "Tipo de CUIT" en filas viejas que no lo tienen. */
+function completarTipoCuit_() {
+  const T = table_();
+  if (T.map.tipoCuit === undefined) return;
+  T.recs.forEach(function (r) { if (!r.tipoCuit && r.cuit) writeRec_(T, { row: r._row, rec: r }, { tipoCuit: tipoCuit_(r.cuit) }); });
 }
 
 /* Informe de duplicados existentes (de versiones anteriores). No borra nada: solo lista. */
@@ -578,9 +603,10 @@ function revisarDuplicados() {
   };
   let n = 0;
   by('nro').forEach(function (x) { n++; Logger.log('Nro de solicitud repetido ' + x[0] + ' en filas ' + x[1].map(function (r) { return r._row; }).join(', ')); });
+  // CUIT repetido es válido (sucursales): solo se informa para revisar.
   by('cuit').forEach(function (x) {
     const vivos = x[1].filter(function (r) { return r.estado !== 'Rechazada'; });
-    if (vivos.length > 1) { n++; Logger.log('CUIT ' + fmtCuit_(x[0]) + ' con ' + vivos.length + ' solicitudes activas: ' + vivos.map(function (r) { return r.nro + ' (' + r.estado + ', fila ' + r._row + ')'; }).join(', ') + '. Dejá una y pasá las demás a "Rechazada".'); }
+    if (vivos.length > 1) Logger.log('Info: CUIT ' + fmtCuit_(x[0]) + ' en ' + vivos.length + ' solicitudes (¿sucursales?): ' + describeSame_(vivos));
   });
   by('nroCliente').forEach(function (x) { n++; Logger.log('Número de cliente ' + x[0] + ' repetido en: ' + x[1].map(function (r) { return r.nro; }).join(', ')); });
   if (!n) Logger.log('Sin duplicados.');
@@ -589,5 +615,5 @@ function revisarDuplicados() {
 
 /* Prueba del email de alta: llega a tu propia cuenta. */
 function probarEmailAlta() {
-  mailAlta_({ razon: 'CLIENTE DE PRUEBA S.R.L.', fantasia: '', cuit: '30712345671', nroCliente: '12345', email: Session.getEffectiveUser().getEmail() });
+  mailAlta_({ razon: 'CLIENTE DE PRUEBA S.R.L.', fantasia: '', cuit: '30712345671', nroCliente: '12345', vendedor: 'Juan Pérez', email: Session.getEffectiveUser().getEmail() });
 }

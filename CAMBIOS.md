@@ -1,4 +1,77 @@
+# Cambios de la versión 3.2 (16/10/2026)
+
+## CUIT repetido: ahora avisa, no bloquea
+
+Un cliente que ya tiene cuenta puede dar de alta **otras sucursales con el mismo CUIT**, cada una con su propio número de cliente en Magnus. Por eso se quitaron los bloqueos de la versión 3.0 y se reemplazaron por avisos:
+
+| Dónde | Qué se ve |
+|---|---|
+| Formulario, paso 1 | Apenas escribe el CUIT, un aviso amarillo: "Este CUIT ya tiene una cuenta en Corti-Fer. Si es **otra sucursal**, seguí adelante…", con el enlace para crear su usuario web por si ya era cliente. Si tiene una solicitud en curso, se lo dice. **Puede continuar igual.** |
+| Email a administración | El asunto empieza con **[CUIT repetido]** y el cuerpo lista las otras solicitudes con su estado y número de cliente. |
+| Panel, lista | Etiqueta "CUIT repetido" en cada solicitud que comparte CUIT (las rechazadas no cuentan). |
+| Panel, ficha | Aviso con las otras solicitudes (link, estado, número de cliente y razón social), **arriba** del botón de alta. |
+| Confirmación de alta | Si el CUIT ya es cliente: "ATENCIÓN: este CUIT ya es cliente (N° 10458). Se crea otra cuenta para esta sucursal." |
+| Planilla | La columna "Otras solicitudes mismo CUIT" ahora incluye el número de cliente de cada una. |
+
+Lo que **sigue protegido**:
+- **El número de cliente no puede repetirse nunca.** Cada sucursal necesita uno distinto.
+- **El mismo envío no se guarda dos veces**, gracias al ID de envío.
+
+También se volvió a permitir reabrir una solicitud rechazada aunque el CUIT tenga otras.
+
+## Aviso de CUIL / persona física
+
+Los números que empiezan con **20, 23, 24, 25, 26 o 27** son de persona física (CUIL o CUIT personal, como el de un monotributista). No se bloquean, pero se avisa:
+- **Al cliente:** "Este número es de persona física (CUIL / CUIT personal). Verificá que sea el CUIT con el que facturás."
+- **A administración:** en el email y en la ficha, y en la confirmación de alta aparece "(persona física / CUIL)".
+- **En la planilla:** queda en la columna nueva **"Tipo de CUIT"** ("Persona física (CUIL)" o "Empresa"). `setup()` la completa también en las filas que ya existían.
+
+## Campo obligatorio: Vendedor / viajante
+
+- Va en el paso 1, en la sección **"Tu vendedor en Corti-Fer"**, con la ayuda "Nombre y apellido de la persona de Corti-Fer que te atiende".
+- **Obligatorio**, con nombre y apellido: al menos dos palabras de 2 letras o más, sin números. Si escriben solo "Juan", se les pide el apellido.
+- Se guarda prolijo: "juan  PÉREZ" queda "Juan Pérez".
+- Aparece en:
+  - la revisión antes de enviar
+  - la planilla (columna nueva **"Vendedor / viajante"**)
+  - el email a administración
+  - la ficha del panel, debajo de la razón social
+  - "Copiar fila" y el Excel
+  - el email de alta al cliente, como "Tu vendedor"
+- La búsqueda del panel también encuentra por vendedor.
+
+## Para actualizar desde la 3.0 / 3.1
+
+1. Pegá el `Code.gs` nuevo en Apps Script.
+2. Ejecutá **`setup`**: agrega las columnas "Vendedor / viajante" y "Tipo de CUIT".
+3. Publicá la implementación: **Implementar → Administrar implementaciones → ✏️ → Nueva versión**.
+4. Subí los archivos de la web. Ya tienen `?v=3.2`, así que los navegadores bajan los nuevos.
+
+Las solicitudes cargadas antes de esta versión no tienen vendedor: en la ficha simplemente no aparece.
+
+## Pruebas
+
+- **Servidor (43 casos, todos OK).** Se agregaron:
+  - vendedor obligatorio y con apellido
+  - CUIT repetido aceptado y avisado en el email
+  - CUIL detectado
+  - mismo CUIT dado de alta como sucursal con otro número
+  - número de cliente repetido sigue rechazado
+  - `revisarDuplicados` trata el CUIT repetido como información
+- **Navegador:**
+  - aviso de CUIT ya cliente (sin error) y de CUIL
+  - vendedor vacío y con un solo nombre
+  - envío con corte de conexión sin duplicar
+  - panel con etiqueta y aviso de CUIT repetido
+  - confirmación con "ATENCIÓN"
+  - aviso de persona física
+  - sin errores de JavaScript
+
+---
+
 # Cambios de la versión 3.0 (16/10/2026)
+
+> Nota: en la 3.2 el bloqueo por CUIT repetido (puntos 1 y 5) se cambió por avisos. Ver arriba.
 
 Revisión completa de la versión que se nos envió (`corti-fer-alta-corregido.zip`). Abajo están los errores encontrados, la causa de cada uno y cómo quedó resuelto.
 

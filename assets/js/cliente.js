@@ -5,8 +5,10 @@
  * - El borrador se guarda en este navegador (sin adjuntos) y vence a los CFG.DRAFT_DAYS días.
  * - Cada envío lleva un ID único (reqId): si la conexión se corta y se reintenta, el servidor
  *   devuelve el mismo número de solicitud en lugar de crear otra.
- * - El CUIT se consulta al servidor apenas es válido: si ya es cliente o tiene una solicitud
- *   en curso se avisa en el paso 1, antes de completar todo.
+ * - El CUIT se consulta al servidor apenas es válido. Si ya está registrado se AVISA (no se bloquea:
+ *   un cliente puede dar de alta otra sucursal con el mismo CUIT). También se avisa si es un CUIL /
+ *   CUIT de persona física.
+ * - El nombre y apellido del vendedor / viajante es obligatorio.
  */
 (function () {
   'use strict';
@@ -21,7 +23,7 @@
   const URL_REGISTRO = 'https://www.corti-fer.com.ar/registracion.aspx?TipoRegistracion=1';
 
   let D = {}, step = 0, FILES = {}, DONE = null, SENDING = false, reqId = A.uid();
-  const CUIT_ST = {};            // cuit → 'libre' | 'cliente' | 'en_curso' | 'consultando'
+  const CUIT_ST = {};            // cuit → { estado: 'libre' | 'cliente' | 'en_curso' | 'consultando' }
   let cuitTimer = null;
 
   /* ---------- Reglas por campo ---------- */
@@ -33,11 +35,9 @@
     cuit: (v) => {
       if (!req(v)) return 'Ingresá el CUIT.';
       if (!A.cuitOk(v)) return 'Este CUIT no es válido. Revisá los 11 números.';
-      const st = CUIT_ST[cuitDigits()];
-      if (st && st.estado === 'cliente') return 'Este CUIT ya es cliente de Corti-Fer.';
-      if (st && st.estado === 'en_curso') return 'Ya hay una solicitud en curso para este CUIT' + (st.nro ? ' (' + st.nro + ')' : '') + '. Administración se va a comunicar con vos.';
       return '';
     },
+    vendedor: (v) => !req(v) ? 'Escribí el nombre y apellido de tu vendedor o viajante.' : (A.nombreOk(v) ? '' : 'Escribí nombre y apellido (por ejemplo: Juan Pérez).'),
     email: (v) => !req(v) ? 'Ingresá un email.' : (A.mailOk(v) ? '' : 'Falta algo en el email, por ejemplo @ o el dominio.'),
     movil: (v) => !req(v) ? 'Ingresá un teléfono móvil.' : (A.phoneOk(v) ? '' : TEL),
     otroTel: (v) => !req(v) || A.phoneOk(v) ? '' : TEL,
@@ -59,7 +59,7 @@
     RULES['bt' + i] = RULES['rt' + i];
   }
   const STEPKEYS = [
-    ['razon', 'cuit', 'email', 'movil', 'otroTel', 'domCalle', 'domCiudad', 'domProv', 'domCP'],
+    ['razon', 'cuit', 'email', 'movil', 'otroTel', 'vendedor', 'domCalle', 'domCiudad', 'domProv', 'domCP'],
     ['entCalle', 'entCiudad', 'entProv', 'entCP', 'entTel'],
     ['rt1', 'rt2', 'rt3', 'bt1', 'bt2', 'bt3'],
     ['iva', 'convenio', 'convNro'],
@@ -76,12 +76,12 @@
       CUIT_ST[c] = { estado: 'consultando' };
       try {
         const r = await A.api({ action: 'checkCuit', cuit: c }, { timeout: 12000 });
-        CUIT_ST[c] = { estado: r.estado, nro: r.nro };
+        CUIT_ST[c] = { estado: r.estado };
       } catch (err) {
         delete CUIT_ST[c];   // sin conexión: el servidor lo vuelve a controlar al enviar
         return;
       }
-      if (cuitDigits() === c && step === 0 && document.querySelector('[data-f="cuit"]')) softCheck('cuit');
+      if (cuitDigits() === c && step === 0) cuitWarn();
     }, 350);
   }
 
@@ -101,7 +101,8 @@
         (o.max ? ' maxlength="' + o.max + '"' : '') + (o.mono ? ' class="mono"' : '') + ' aria-describedby="e_' + k + '">';
     }
     return '<div class="' + cls + '" data-f="' + k + '"><label for="' + k + '">' + label + (o.opt ? ' <span class="opt">(opcional)</span>' : '') + '</label>' + input +
-      (o.hint ? '<span class="hint">' + o.hint + '</span>' : '') + '<span class="okmark">' + (o.okmsg || '') + '</span><span class="err" id="e_' + k + '"></span></div>';
+      (o.hint ? '<span class="hint">' + o.hint + '</span>' : '') + '<span class="okmark">' + (o.okmsg || '') + '</span><span class="err" id="e_' + k + '"></span>' +
+      '<span class="warnmsg" id="w_' + k + '" role="status" hidden></span></div>';
   }
   function fileBox(k, label, hint, later) {
     const f = FILES[k];
@@ -119,6 +120,8 @@
       fld('email', 'Email', { type: 'email', ac: 'email', span: 'c3', hint: 'Acá te avisamos cuando tu cuenta esté activa.', max: 200 }) +
       fld('movil', 'Teléfono móvil', { type: 'tel', ac: 'tel-national', inputmode: 'tel', ph: '3416004728', span: 'c3', hint: 'Con código de área, sin 0 ni 15.' }) +
       fld('otroTel', 'Otro teléfono', { type: 'tel', inputmode: 'tel', opt: 1, span: 'c3' }) +
+      '</div><div class="sec">Tu vendedor en Corti-Fer</div><div class="grid">' +
+      fld('vendedor', 'Vendedor / viajante', { ac: 'off', ph: 'Nombre y apellido', hint: 'Nombre y apellido de la persona de Corti-Fer que te atiende.', max: 80 }) +
       '</div><div class="sec">Domicilio legal</div><div class="grid">' +
       fld('domCalle', 'Calle y número', { ac: 'address-line1', max: 200 }) +
       fld('domCiudad', 'Ciudad', { ac: 'address-level2', span: 'c3', max: 200 }) +
@@ -214,15 +217,26 @@
     w.classList.toggle('bad', !!msg);
     if (e) {
       e.textContent = msg || '';
-      const st = k === 'cuit' && CUIT_ST[cuitDigits()];
-      if (msg && st && st.estado === 'cliente') {
-        e.insertAdjacentHTML('beforeend', ' <a href="' + URL_REGISTRO + '" target="_blank" rel="noopener">Crear mi usuario en la web</a>');
-      }
     }
+    if (k === 'cuit') cuitWarn();
     w.classList.toggle('good', !msg && !!D[k] && k === 'cuit');
     w.querySelectorAll('input,select').forEach((inp) => inp.setAttribute('aria-invalid', msg ? 'true' : 'false'));
   }
   const softCheck = (k) => { if (RULES[k]) setErr(k, RULES[k](D[k])); };
+
+  /* Avisos del CUIT (no impiden continuar): ya registrado y/o persona física. */
+  function cuitWarn() {
+    const w = $('#w_cuit'); if (!w) return;
+    const c = cuitDigits(), msgs = [];
+    if (A.cuitOk(c)) {
+      const st = CUIT_ST[c];
+      if (st && st.estado === 'cliente') msgs.push('Este CUIT ya tiene una cuenta en Corti-Fer. Si es <b>otra sucursal</b>, seguí adelante: se le asigna un número de cliente nuevo. Si ya sos cliente y solo querés comprar por la web, <a href="' + URL_REGISTRO + '" target="_blank" rel="noopener">creá tu usuario acá</a>.');
+      else if (st && st.estado === 'en_curso') msgs.push('Ya hay una solicitud de alta en curso con este CUIT. Si es <b>otra sucursal</b>, seguí adelante; si no, no hace falta enviarla de nuevo.');
+      if (A.esPersona(c)) msgs.push('Este número es de <b>persona física (CUIL / CUIT personal)</b>. Verificá que sea el CUIT con el que facturás.');
+    }
+    w.innerHTML = msgs.map((m) => '<span>' + m + '</span>').join('');
+    w.hidden = !msgs.length;
+  }
   function validateStep(s) {
     const bad = [];
     STEPKEYS[s].forEach((k) => { const m = RULES[k] ? RULES[k](D[k]) : ''; setErr(k, m); if (m) bad.push(k); });
@@ -324,11 +338,6 @@
       $('#resetDraft').hidden = true;
       renderDone();
     } catch (err) {
-      if (err.code === 'CUIT_CLIENTE' || err.code === 'CUIT_EN_CURSO') {
-        CUIT_ST[cuitDigits()] = { estado: err.code === 'CUIT_CLIENTE' ? 'cliente' : 'en_curso', nro: err.data && err.data.nro };
-        showStepError(0);
-        return;
-      }
       box.textContent = 'No pudimos enviar la solicitud. ' + err.message + ' Tus datos siguen cargados: podés volver a tocar "Enviar solicitud" sin riesgo de duplicarla.';
       box.classList.add('on');
       box.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -347,7 +356,7 @@
     D[k] = t.type === 'checkbox' ? t.checked : t.value;
     if (k === 'cuit') {
       t.value = D.cuit = A.fmtCuit(t.value);
-      if (A.cuitOk(D.cuit)) { softCheck('cuit'); checkCuitSoon(); }
+      if (A.cuitOk(D.cuit)) { softCheck('cuit'); checkCuitSoon(); } else cuitWarn();
     }
     if (k === 'mismoDom') $('#entGrid').hidden = D.mismoDom;
     if (k === 'convenio') { $('#convBox').hidden = D.convenio !== 'Sí'; setErr('convenio', ''); }

@@ -44,6 +44,17 @@
   const cpOk = (v) => /^\d{4}$/.test(String(v || '').trim()) || /^[A-Za-z]\d{4}[A-Za-z]{3}$/.test(String(v || '').trim());
   const mailOk = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v || '').trim());
   const req = (v) => String(v == null ? '' : v).trim().length > 0;
+  /* Persona física (CUIL / CUIT personal): prefijos 20 a 27. Empresas: 30, 33, 34. */
+  const esPersona = (c) => ['20', '23', '24', '25', '26', '27'].indexOf(String(c || '').replace(/\D/g, '').slice(0, 2)) >= 0;
+  /* Nombre y apellido: al menos dos palabras de 2+ letras; solo letras, espacios, ' . - */
+  const LETRAS = "A-Za-zÁÉÍÓÚÜÑáéíóúüñ";
+  function nombreOk(v) {
+    v = String(v || '').replace(/\s+/g, ' ').trim();
+    return new RegExp("^[" + LETRAS + "' .\\-]+$").test(v) &&
+      v.split(' ').filter((w) => w.replace(new RegExp('[^' + LETRAS + ']', 'g'), '').length >= 2).length >= 2;
+  }
+  const nombre = (v) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, 80).toLowerCase()
+    .replace(/(^|[\s'-])([a-záéíóúüñ])/g, (m, a, b) => a + b.toUpperCase());
   /* Número de cliente de Magnus: números y letras, sin espacios, hasta 20. */
   const normNroCliente = (v) => String(v || '').trim().toUpperCase().replace(/\s+/g, '');
   const nroClienteOk = (v) => /^[A-Z0-9][A-Z0-9\-\/.]{0,19}$/.test(normNroCliente(v));
@@ -57,7 +68,7 @@
     const o = {
       razon: up(D.razon), fantasia: tr(D.fantasia),
       cuit: String(D.cuit || '').replace(/\D/g, ''),
-      email: tr(D.email).toLowerCase(),
+      email: tr(D.email).toLowerCase(), vendedor: nombre(D.vendedor),
       movil: phone(D.movil), otroTel: phone(D.otroTel),
       domCalle: up(D.domCalle), domCiudad: up(D.domCiudad), domProv: tr(D.domProv), domCP: up(D.domCP),
       mismoDom: m,
@@ -89,7 +100,7 @@
     };
     const fl = (k, need) => files[k] ? files[k] : (need ? 'Pendiente' : '');
     return [
-      { g: 'Datos del cliente', step: 0, r: [['Razón social', d.razon], ['Nombre de fantasía', d.fantasia], ['CUIT', d.cuit ? fmtCuit(d.cuit) : ''], ['Email', d.email], ['Teléfono móvil', d.movil], ['Otro teléfono', d.otroTel]] },
+      { g: 'Datos del cliente', step: 0, r: [['Razón social', d.razon], ['Nombre de fantasía', d.fantasia], ['CUIT', d.cuit ? fmtCuit(d.cuit) : ''], ['Email', d.email], ['Teléfono móvil', d.movil], ['Otro teléfono', d.otroTel], ['Vendedor / viajante', d.vendedor]] },
       { g: 'Domicilio legal', step: 0, r: [['Calle y número', d.domCalle], ['Ciudad', d.domCiudad], ['Provincia', d.domProv], ['Código postal', d.domCP]] },
       { g: 'Domicilio de entrega', step: 1, r: [['Calle y número', d.entCalle], ['Ciudad', d.entCiudad], ['Provincia', d.entProv], ['Código postal', d.entCP], ['Teléfono en destino', d.entTel], ['Transporte', d.transporte]] },
       { g: 'Referencias', step: 2, r: refs('Comercial', 'rn', 'rt', 'rc').concat(refs('Bancaria', 'bn', 'bt', 'bc')) },
@@ -172,5 +183,5 @@
     try { navigator.clipboard.writeText(text).then(done, fb); } catch (e) { fb(); }
   }
 
-  window.Alta = { CFG, PROV, IVA, TRANSP, FILE_KEYS, $, esc, cuitOk, fmtCuit, phone, phoneOk, cpOk, mailOk, req, normNroCliente, nroClienteOk, normalize, rowsOf, valText, valRaw, uid, api, toast, copy };
+  window.Alta = { CFG, PROV, IVA, TRANSP, FILE_KEYS, $, esc, cuitOk, fmtCuit, phone, phoneOk, cpOk, mailOk, req, esPersona, nombreOk, nombre, normNroCliente, nroClienteOk, normalize, rowsOf, valText, valRaw, uid, api, toast, copy };
 })();

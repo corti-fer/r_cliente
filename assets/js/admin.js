@@ -95,7 +95,7 @@
   function filtered() {
     const q = F.q.toLowerCase().replace(/[-\s]/g, '');
     return LIST.filter((s) => (!F.estado || s.estado === F.estado) &&
-      (!q || [s.razon, s.fantasia, s.cuit, s.email, s.nro, s.nroCliente].join('|').toLowerCase().replace(/[-\s]/g, '').indexOf(q) >= 0));
+      (!q || [s.razon, s.fantasia, s.cuit, s.email, s.nro, s.nroCliente, s.vendedor].join('|').toLowerCase().replace(/[-\s]/g, '').indexOf(q) >= 0));
   }
   const parseDate = (v) => { const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}))?/); return m ? new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)) : null; };
 
@@ -121,6 +121,7 @@
     $('#list').innerHTML = items.length ? items.map((s) =>
       '<button type="button" class="item" data-nro="' + esc(s.nro) + '"' + (CUR && CUR.nro === s.nro ? ' aria-current="true"' : '') + '>' +
       '<span class="n">' + esc(s.razon || '(sin razón social)') + '</span>' +
+      (cuitRepetido(s) ? '<span class="flag">CUIT repetido</span>' : '') +
       '<span class="m"><span class="mono">' + esc(s.nro) + ' · ' + esc((s.fecha || '').slice(0, 10)) + (s.nroCliente ? ' · Cl. ' + esc(s.nroCliente) : '') + '</span>' +
       '<span class="pill ' + (PILL[s.estado] || '') + '">' + esc(s.estado) + '</span></span></button>'
     ).join('') : '<p class="muted pad">' + (LIST.length ? 'No hay solicitudes con ese filtro.' : 'Todavía no hay solicitudes.') + '</p>';
@@ -146,8 +147,10 @@
     A.FILE_KEYS.forEach((k) => { if (r[k]) o[k] = { text: 'Ver archivo', url: r[k] }; });
     return o;
   }
-  const otherSameCuit = (r) => LIST.filter((s) => s.nro !== r.nro && s.cuit === r.cuit);
-  const altaPrevia = (r) => otherSameCuit(r).find((s) => s.estado === 'Dada de alta');
+  /* El CUIT puede repetirse (sucursales): se avisa, no se bloquea. */
+  const otherSameCuit = (r) => LIST.filter((s) => s.nro !== r.nro && s.cuit === r.cuit && s.estado !== 'Rechazada');
+  const cuitRepetido = (r) => r.estado !== 'Rechazada' && otherSameCuit(r).length > 0;
+  const descOtra = (s) => '<a href="#" data-goto-nro="' + esc(s.nro) + '">' + esc(s.nro) + '</a> · ' + esc(s.estado) + (s.nroCliente ? ' · cliente <b>' + esc(s.nroCliente) + '</b>' : '') + (s.razon ? ' · ' + esc(s.razon) : '');
 
   /* Valida el número de cliente antes de ir al servidor (el servidor lo vuelve a controlar). */
   function nroClienteError(r, v) {
@@ -164,11 +167,6 @@
       '<span class="err" id="nroCliErr" role="alert"></span></div></div>';
   }
   function altaBox(r) {
-    const prev = altaPrevia(r);
-    if (r.estado !== 'Dada de alta' && prev) {
-      return '<div class="altabox bad"><div><b>Este CUIT ya es cliente.</b><br>Se dio de alta en la solicitud <a href="#" data-goto-nro="' + esc(prev.nro) + '">' + esc(prev.nro) + '</a>' +
-        (prev.nroCliente ? ' con el número de cliente <b>' + esc(prev.nroCliente) + '</b>' : '') + '. Pasá esta solicitud a "Rechazada".</div></div>';
-    }
     if (r.estado === 'Dada de alta' && r.notificado) {
       return '<div class="altabox ok"><div class="cl"><span>Cliente N°</span><b class="mono">' + esc(r.nroCliente || '—') + '</b></div>' +
         '<div><b>Dada de alta el ' + esc(r.fechaAlta) + '.</b><br>Email con número de cliente y enlace de registración enviado a ' + esc(r.email) + ' el ' + esc(r.notificado) + '.' +
@@ -190,14 +188,17 @@
     const g = A.rowsOf(r, filesOf(r));
     const pend = [];
     g.forEach((b) => b.r.forEach((x) => { if (x[1] === 'Pendiente') pend.push(x[0]); }));
-    let h = '<div class="dethead"><div><h2>' + esc(r.razon) + '</h2><div class="mono sub">' + esc(r.nro) + ' · recibida ' + esc(r.fecha) + '</div></div>' +
+    let h = '<div class="dethead"><div><h2>' + esc(r.razon) + '</h2><div class="mono sub">' + esc(r.nro) + ' · recibida ' + esc(r.fecha) + '</div>' +
+      (r.vendedor ? '<div class="vend">Vendedor / viajante: <b>' + esc(r.vendedor) + '</b></div>' : '') + '</div>' +
       '<div class="acts"><button class="btn sm" type="button" data-act="fila">Copiar fila</button><button class="btn sm" type="button" data-act="xlsx">Descargar Excel</button></div></div>';
     h += '<div class="estado" role="group" aria-label="Estado"><span class="pill big ' + (PILL[r.estado] || '') + '">' + esc(r.estado) + '</span>' +
       (r.estado === 'Dada de alta' ? '' : ESTADOS_MANUALES.filter((e) => e !== r.estado).map((e) => '<button type="button" data-estado="' + e + '">Pasar a ' + e + '</button>').join('')) + '</div>';
-    h += altaBox(r);
     const otras = otherSameCuit(r);
-    if (otras.length) h += '<div class="banner">Otras solicitudes con este CUIT: ' + otras.map((s) => '<a href="#" data-goto-nro="' + esc(s.nro) + '">' + esc(s.nro) + '</a> (' + esc(s.estado) + ')').join(', ') + '.</div>';
+    if (otras.length) h += '<div class="banner cuitdup"><b>CUIT repetido.</b> También figura en:<ul>' + otras.map((s) => '<li>' + descOtra(s) + '</li>').join('') + '</ul>' +
+      'Si es otra sucursal, dala de alta con un <b>número de cliente distinto</b>. Si es la misma, pasá esta solicitud a "Rechazada".</div>';
+    if (A.esPersona(r.cuit)) h += '<div class="banner"><b>CUIL / persona física.</b> El número empieza con ' + esc(String(r.cuit).slice(0, 2)) + '. Verificá que sea el CUIT con el que factura.</div>';
     if (pend.length) h += '<div class="banner">Documentación pendiente: ' + pend.map(esc).join(', ') + '.</div>';
+    h += altaBox(r);
     g.forEach((b) => {
       if (!b.r.length) return;
       h += '<div class="grp"><h3>' + b.g + '</h3>';
@@ -235,7 +236,7 @@
       else if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = old; }
       if (err.code === 'CLIENT_NUMBER' || err.code === 'CLIENT_NUMBER_DUP') { showNroErr(err.message); }
       else A.toast(err.message, 5000);
-      if (err.code === 'NOTFOUND' || err.code === 'CUIT_ALTA' || err.code === 'STATE') loadList();
+      if (err.code === 'NOTFOUND' || err.code === 'STATE') loadList();
     } finally { BUSY = false; }
   }
   function showNroErr(msg) {
@@ -251,7 +252,9 @@
     showNroErr('');
     const txt = force
       ? '¿Enviar el email de alta a ' + r.email + '?\n\nNúmero de cliente: ' + v
-      : 'Vas a dar de alta a:\n\n' + r.razon + '\nCUIT ' + A.fmtCuit(r.cuit) + '\nNúmero de cliente: ' + v + '\n\nSe le envía un email a ' + r.email + ' con el número de cliente y el enlace para crear su usuario.\n\n¿Continuar?';
+      : 'Vas a dar de alta a:\n\n' + r.razon + '\nCUIT ' + A.fmtCuit(r.cuit) + (A.esPersona(r.cuit) ? ' (persona física / CUIL)' : '') + '\nNúmero de cliente: ' + v +
+        (otherSameCuit(r).some((s) => s.estado === 'Dada de alta') ? '\n\nATENCIÓN: este CUIT ya es cliente (N° ' + otherSameCuit(r).filter((s) => s.nroCliente).map((s) => s.nroCliente).join(', ') + '). Se crea otra cuenta para esta sucursal.' : '') +
+        '\n\nSe le envía un email a ' + r.email + ' con el número de cliente y el enlace para crear su usuario.\n\n¿Continuar?';
     if (!confirm(txt)) return;
     act(async () => {
       const res = await call('approve', { nro: r.nro, nroCliente: v, force: !!force }, 60000);

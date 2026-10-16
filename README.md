@@ -1,4 +1,4 @@
-# Alta de clientes · Corti-Fer (v3.0)
+# Alta de clientes · Corti-Fer (v3.2)
 
 Formulario web para que un cliente nuevo cargue sus datos, y un panel aparte para que administración lo revise, le asigne el número de cliente y lo dé de alta.
 
@@ -52,10 +52,10 @@ apps-script/appsscript.json   manifiesto de Apps Script
 4. **GitHub:** reemplazá todos los archivos del repositorio por los de esta carpeta. Borrá `assets/img/logo-corti-fer.svg`, `logo-corti-fer.png` y `favicon.png` (ya no se usan) y los README viejos.
    - `config.js` ya tiene tu URL `/exec`.
    - En `index.html`, cambiá `TU-SITIO` en la línea `og:image` por la dirección real del sitio (es para la vista previa en WhatsApp).
-5. Abrí la URL `/exec` en el navegador: tiene que responder `"version":"3.0"`.
+5. Abrí la URL `/exec` en el navegador: tiene que responder `"version":"3.2"`.
 6. Probá con los pasos de "Prueba antes de mandarlo a clientes", más abajo.
 
-> **Cada vez que cambies algo en los archivos de la web**, subí el número `?v=3.0` en `index.html` y `admin/index.html` (por ejemplo a `?v=3.1`). Así nadie se queda con la versión vieja en caché.
+> **Cada vez que cambies algo en los archivos de la web**, subí el número `?v=3.2` en `index.html` y `admin/index.html` (por ejemplo a `?v=3.3`). Así nadie se queda con la versión vieja en caché.
 > **Si cambiás `Code.gs`**, actualizá `API_VERSION` en `Code.gs` y en `config.js` con el mismo número.
 
 ## Instalación desde cero
@@ -92,10 +92,12 @@ Para probar el email de alta sin un cliente real, ejecutá `probarEmailAlta`: te
 ## Reglas que aplica el sistema
 
 - **Un envío, una fila.** Si el cliente toca "Enviar" dos veces o se corta internet, no se duplica.
-- **Un CUIT, una cuenta.**
-  - No puede pedir el alta un CUIT que ya es cliente: se le muestra el enlace para crear su usuario web.
-  - No puede pedirla un CUIT con una solicitud en curso.
-  - No se puede dar de alta dos veces el mismo CUIT.
+- **El CUIT puede repetirse** (un cliente con varias sucursales tiene un número de cliente por sucursal). No se bloquea, pero se avisa:
+  - al cliente, en el paso 1, apenas escribe el CUIT;
+  - a administración, en el asunto del email ("[CUIT repetido]"), en la lista ("CUIT repetido") y en la ficha, con las otras solicitudes y sus números de cliente;
+  - en la confirmación de alta, si ese CUIT ya es cliente.
+- **CUIL / persona física** (CUIT que empieza con 20, 23, 24, 25, 26 o 27): se avisa al cliente, en el email y en la ficha. La planilla lo anota en la columna "Tipo de CUIT".
+- **Vendedor / viajante:** nombre y apellido obligatorios. Se guarda con Mayúscula Inicial y aparece en la ficha, el email a administración y el email de alta.
 - **Número de cliente:**
   - Es obligatorio para dar de alta.
   - Lleva solo números o letras, hasta 20.
@@ -125,7 +127,7 @@ Para probar el email de alta sin un cliente real, ejecutá `probarEmailAlta`: te
    - el aviso a `NOTIFY_TO`
    - el acuse en tu email
    - el adjunto en Drive
-2. Volvé a cargar el **mismo CUIT**: tiene que avisar "Ya hay una solicitud en curso".
+2. Volvé a cargar el **mismo CUIT**: tiene que avisar (sin bloquear) y el email a administración tiene que llegar con "[CUIT repetido]".
 3. Abrí el link del aviso e ingresá la clave: la solicitud tiene que aparecer abierta.
 4. Cargá un número de cliente y tocá **Dar de alta y enviar email**. Te tiene que llegar el email con el número y el botón "Crear mi cuenta".
-5. Probá cargar el mismo CUIT en el formulario: tiene que decir "ya es cliente", con el enlace de registración.
+5. Cargá el mismo CUIT como otra sucursal y dale de alta con **otro** número de cliente. Con el mismo número tiene que rechazarlo.

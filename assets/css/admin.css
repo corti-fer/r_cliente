@@ -75,3 +75,9 @@
 .row:hover .btn.ghost{opacity:1}
 @media (max-width:520px){.row{grid-template-columns:1fr auto}.row .k{grid-column:1/-1}}
 .history{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 var(--f-mono);color:var(--muted);background:var(--field);border:1px solid var(--line);padding:10px 12px;border-radius:8px;margin:0}
+.item .flag{justify-self:start;font-size:11px;font-weight:700;color:var(--warn);background:var(--warn-soft);border-radius:4px;padding:1px 6px}
+.dethead .vend{font-size:13px;color:var(--muted);margin-top:4px}
+.dethead .vend b{color:var(--ink)}
+.banner.cuitdup{border-left:4px solid var(--warn)}
+.banner ul{margin:6px 0;padding-left:18px}
+.banner li{margin:2px 0}
