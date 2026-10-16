@@ -1,0 +1,80 @@
+/* Formulario del cliente: bienvenida, pasos, revisión y pantalla final. */
+
+.hero{padding:26px 0 6px}
+.hero h1{font:700 italic 30px/1.1 var(--f-display);color:var(--ink)}
+.hero h1 span{color:var(--brand-text)}
+.hero p{margin:6px 0 0;color:var(--muted)}
+@media (max-width:560px){.hero{padding-top:18px}.hero h1{font-size:25px}}
+
+/* Pasos */
+.steps{display:flex;gap:6px;margin:18px 0 6px;padding:0;list-style:none}
+.steps li{flex:1;min-width:0}
+.steps button{width:100%;border:0;background:none;padding:0;text-align:left;cursor:pointer}
+.steps .bar{display:block;height:5px;border-radius:3px;background:var(--line);margin-bottom:6px;transform:skewX(-20deg)}
+.steps .done .bar{background:var(--black)}
+.steps .cur .bar{background:var(--brand)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .steps .done .bar{background:var(--muted)}}
+.steps .lbl{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;font-weight:500}
+.steps .cur .lbl{color:var(--ink);font-weight:700}
+.stepmeta{font-size:13px;color:var(--muted);margin:0 0 14px}
+@media (max-width:520px){.steps .lbl{display:none}}
+
+/* Controles particulares */
+.sec{margin:26px 0 12px;font:700 12px/1 var(--f-display);text-transform:uppercase;letter-spacing:.1em;color:var(--ink);display:flex;align-items:center;gap:10px}
+.sec::before{content:"";width:14px;height:4px;background:var(--brand);transform:skewX(-20deg)}
+.sec::after{content:"";flex:1;height:1px;background:var(--line)}
+.check{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:var(--field);cursor:pointer;margin-bottom:16px}
+.check:has(input:checked){border-color:var(--brand);background:var(--brand-soft)}
+.check input{margin-top:3px;width:17px;height:17px;accent-color:var(--brand)}
+.check .hint{font-size:13px}
+.seg{display:flex;gap:8px}
+.seg label{flex:1;display:flex;align-items:center;justify-content:center;height:44px;border:1px solid var(--line);border-radius:8px;background:var(--field);cursor:pointer;font-weight:600;position:relative}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label:has(input:checked){background:var(--brand);border-color:var(--brand);color:#fff}
+.seg label:has(input:focus-visible){outline:2px solid var(--brand);outline-offset:2px}
+.f.bad .seg label{border-color:var(--bad)}
+.reflist{display:grid;gap:12px}
+.refrow{display:grid;grid-template-columns:2fr 1.2fr 1.2fr;gap:8px}
+.refrow .f label{font-size:12px;color:var(--muted);font-weight:500}
+@media (max-width:560px){.refrow{grid-template-columns:1fr;padding:12px;border:1px solid var(--line);border-radius:8px}}
+.file{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px dashed var(--muted);border-radius:8px;background:var(--field);cursor:pointer;flex-wrap:wrap}
+.file:hover{border-color:var(--brand)}
+.file input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.file:focus-within{outline:2px solid var(--brand);outline-offset:2px}
+.file .name{flex:1;min-width:140px;overflow-wrap:anywhere;font-size:13px;color:var(--muted)}
+.file.has{border-style:solid;border-color:var(--ok);background:var(--ok-soft)}
+.file.has .name{color:var(--ink);font-weight:500}
+
+.nav{display:flex;justify-content:space-between;gap:10px;margin-top:26px;flex-wrap:wrap}
+.nav .r{margin-left:auto}
+.nav .btn.pri{min-width:180px}
+@media (max-width:420px){.nav .btn{flex:1}}
+.sending{margin:12px 0 0;font-size:13px;color:var(--muted);text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.sending::before{content:"";width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.savednote{font-size:12px;color:var(--muted);margin-top:12px;text-align:center}
+.savednote .linkbtn{font-size:12px}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+
+/* Revisión */
+.rev{display:grid;gap:14px}
+.revb{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.revh{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--field);font-weight:700;border-left:4px solid var(--brand)}
+.revh button{border:0;background:none;color:var(--brand-text);cursor:pointer;font-weight:600;font-size:13px}
+.revempty{margin:0;padding:10px 14px;color:var(--muted);border-top:1px solid var(--line)}
+dl.kv{margin:0;display:grid;grid-template-columns:minmax(110px,180px) 1fr}
+dl.kv dt,dl.kv dd{margin:0;padding:8px 14px;border-top:1px solid var(--line);min-width:0;overflow-wrap:anywhere}
+dl.kv dt{color:var(--muted);font-size:13px}
+dl.kv dd.empty{color:var(--muted)}
+dl.kv dd.pend{color:var(--warn);font-weight:600}
+.legal{font-size:12px;color:var(--muted);margin:16px 0 0}
+@media (max-width:520px){dl.kv{grid-template-columns:1fr}dl.kv dt{padding-bottom:0}dl.kv dd{border-top:0;padding-top:2px}}
+
+/* Final */
+.tick{width:52px;height:52px;border-radius:50%;background:var(--ok-soft);display:grid;place-items:center;margin-bottom:16px}
+.tick svg{width:26px;height:26px;stroke:var(--ok);fill:none;stroke-width:2.6}
+.done-box .lead{margin-bottom:6px}
+.nro{font:700 24px var(--f-mono);background:var(--brand-soft);color:var(--brand-text);display:inline-block;padding:8px 14px;border-radius:8px;margin:6px 0 14px;letter-spacing:.02em}
+.next{margin:16px 0 0;padding:0;list-style:none;display:grid;gap:12px}
+.next li{display:flex;gap:10px}
+.next b{flex:none;width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:12px}

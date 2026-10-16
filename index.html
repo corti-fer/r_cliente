@@ -1,1 +1,57 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Alta de cliente · Corti-Fer</title>
+  <meta name="description" content="Completá tus datos para abrir tu cuenta de cliente en Corti-Fer, mayorista e importador de artículos de ferretería.">
+  <meta name="theme-color" content="#E11B2A">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png?v=3.0">
+  <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png?v=3.0">
+  <!-- Vista previa al compartir el enlace (WhatsApp, email). og:image debe ser una URL completa:
+       reemplazá TU-SITIO por la dirección real donde publiques. -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Alta de cliente · Corti-Fer">
+  <meta property="og:description" content="Completá tus datos para abrir tu cuenta de cliente.">
+  <meta property="og:image" content="https://tu-usuario.github.io/corti-fer/r_cliente/assets/img/miniatura-corti-fer.jpg">
 
+  <link rel="preload" as="image" href="assets/img/logo.png?v=3.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,600;0,700;1,700&display=swap">
+  <link rel="stylesheet" href="assets/css/base.css?v=3.0">
+  <link rel="stylesheet" href="assets/css/cliente.css?v=3.0">
+</head>
+<body>
+  <header class="masthead">
+    <div class="wrap">
+      <a class="brand" href="https://www.corti-fer.com.ar/" aria-label="Corti-Fer, ir al sitio">
+        <img src="assets/img/logo.png?v=3.0" width="720" height="143" alt="Corti-Fer · Mayorista e importador de artículos de ferretería">
+      </a>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <section class="hero">
+      <h1>Alta de <span>cliente</span></h1>
+      <p>Completá tus datos y te avisamos por email cuando tu cuenta esté activa.</p>
+    </section>
+
+    <main id="cliente">
+      <ol class="steps" id="steps" aria-label="Pasos"></ol>
+      <p class="stepmeta" id="stepmeta" aria-live="polite"></p>
+      <noscript><div class="banner">Para completar el formulario necesitás tener JavaScript activado.</div></noscript>
+      <form id="form" class="card" novalidate autocomplete="on"></form>
+      <!-- Trampa para robots: un humano nunca ve ni completa este campo -->
+      <div class="hp" aria-hidden="true"><label for="hp">No completar</label><input id="hp" name="empresa_web" type="text" tabindex="-1" autocomplete="off"></div>
+      <p class="savednote" id="savednote">Tu avance se guarda en este dispositivo por unos días (los archivos adjuntos no).
+        <button type="button" class="linkbtn" id="resetDraft" hidden>Empezar de nuevo</button></p>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="assets/js/config.js?v=3.0"></script>
+  <script src="assets/js/common.js?v=3.0"></script>
+  <script src="assets/js/cliente.js?v=3.0"></script>
+</body>
+</html>
