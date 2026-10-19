@@ -13,7 +13,7 @@
   const ESTADOS = ['Nueva', 'En revisión', 'Dada de alta', 'Rechazada'];
   const ESTADOS_MANUALES = ['Nueva', 'En revisión', 'Rechazada'];
   const PILL = { 'Nueva': 'nueva', 'En revisión': 'rev', 'Dada de alta': 'ok', 'Rechazada': 'gris' };
-  const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  const EXCELJS_URL = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
 
   let KEY = null, LIST = [], CUR = null, BUSY = false, LOADING = false;
   const F = { q: '', estado: '' };
@@ -295,27 +295,119 @@
   });
   $('#detail').addEventListener('input', (e) => { if (e.target.id === 'nroCli') showNroErr(''); });
 
-  /* Excel: la librería (≈900 KB) se descarga recién la primera vez que se usa. */
-  let xlsxP = null;
-  function loadXlsx() {
-    if (window.XLSX) return Promise.resolve();
-    if (!xlsxP) xlsxP = new Promise((ok, ko) => {
-      const s = document.createElement('script'); s.src = XLSX_URL; s.onload = ok;
-      s.onerror = () => { xlsxP = null; ko(new Error('No se pudo descargar el generador de Excel.')); };
+  /* Excel con membrete y estilos: la librería se descarga al usar la función. */
+  let excelP = null;
+  function loadExcelJS() {
+    if (window.ExcelJS) return Promise.resolve();
+    if (!excelP) excelP = new Promise((ok, ko) => {
+      const s = document.createElement('script'); s.src = EXCELJS_URL; s.onload = ok;
+      s.onerror = () => { excelP = null; ko(new Error('No se pudo descargar el generador de Excel.')); };
       document.head.appendChild(s);
     });
-    return xlsxP;
+    return excelP;
+  }
+  async function loadLogoBase64() {
+    try {
+      const response = await fetch('../assets/img/logo.png');
+      if (!response.ok) return null;
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    } catch (_) { return null; }
   }
   async function exportXlsx(r, btn) {
     btn.disabled = true;
     try {
-      await loadXlsx();
-      const aoa = [['FICHA DE ALTA DE CLIENTE', r.nro], ['Estado', r.estado], ['Número de cliente', r.nroCliente || ''], ['Recibida', r.fecha], ['Fecha de alta', r.fechaAlta || ''], []];
-      A.rowsOf(r, filesOf(r)).forEach((b) => { aoa.push([b.g.toUpperCase()]); b.r.forEach((x) => aoa.push([x[0], A.valRaw(x[1])])); aoa.push([]); });
-      const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [{ wch: 30 }, { wch: 60 }];
-      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Ficha');
-      XLSX.writeFile(wb, 'Alta ' + r.nro + ' - ' + String(r.razon).replace(/[^\w\- ]+/g, '').trim().slice(0, 40) + '.xlsx');
-    } catch (err) { A.toast(err.message + ' Usá "Copiar fila".', 4000); }
+      await loadExcelJS();
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Corti-Fer';
+      wb.subject = 'Ficha de registro de cliente';
+      wb.title = 'Ficha de registro de cliente';
+      const ws = wb.addWorksheet('Ficha del cliente', {
+        pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+        properties: { defaultRowHeight: 21 },
+        views: [{ state: 'frozen', ySplit: 5 }]
+      });
+      ws.columns = [{ width: 31 }, { width: 62 }];
+      const navy = '17365D', red = 'E11B2A', pale = 'EAF0F7', light = 'F5F7FA', white = 'FFFFFF';
+      ws.mergeCells('A1:B1');
+      ws.getCell('A1').value = 'CORTI-FER';
+      ws.getCell('A1').font = { name: 'Arial', size: 18, bold: true, color: { argb: navy } };
+      ws.getCell('A1').alignment = { vertical: 'middle', horizontal: 'right' };
+      ws.getRow(1).height = 38;
+      const logo = await loadLogoBase64();
+      if (logo) {
+        const imageId = wb.addImage({ base64: 'data:image/png;base64,' + logo, extension: 'png' });
+        ws.addImage(imageId, { tl: { col: 0.08, row: 0.12 }, ext: { width: 175, height: 35 } });
+      }
+      ws.mergeCells('A2:B2');
+      ws.getCell('A2').value = 'FICHA DE REGISTRO DE CLIENTE';
+      ws.getCell('A2').font = { name: 'Arial', size: 14, bold: true, color: { argb: white } };
+      ws.getCell('A2').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: navy } };
+      ws.getCell('A2').alignment = { vertical: 'middle', horizontal: 'center' };
+      ws.getRow(2).height = 30;
+      ws.mergeCells('A3:B3');
+      ws.getCell('A3').value = 'Solicitud N.º ' + (r.nro || '—');
+      ws.getCell('A3').font = { name: 'Arial', size: 11, bold: true, color: { argb: navy } };
+      ws.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(3).height = 24;
+      const meta = [
+        ['Estado de la solicitud', r.estado || 'Pendiente'],
+        ['Número de cliente', r.nroCliente || ''],
+        ['Fecha de registro', r.fecha || ''],
+        ['Fecha de alta', r.fechaAlta || '']
+      ];
+      let row = 4;
+      for (const item of meta) {
+        ws.getCell(row, 1).value = item[0];
+        ws.getCell(row, 2).value = A.valRaw(item[1]);
+        ws.getCell(row, 1).font = { name: 'Arial', size: 10, bold: true, color: { argb: navy } };
+        ws.getCell(row, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: pale } };
+        ws.getCell(row, 2).font = { name: 'Arial', size: 10, color: { argb: '202833' } };
+        for (let c = 1; c <= 2; c++) {
+          ws.getCell(row, c).alignment = { vertical: 'middle', wrapText: true };
+          ws.getCell(row, c).border = { bottom: { style: 'thin', color: { argb: 'D8DEE8' } } };
+        }
+        row++;
+      }
+      row++;
+      for (const block of A.rowsOf(r, filesOf(r))) {
+        ws.mergeCells(row, 1, row, 2);
+        const heading = ws.getCell(row, 1);
+        heading.value = String(block.g || '').toLocaleUpperCase('es-AR');
+        heading.font = { name: 'Arial', size: 11, bold: true, color: { argb: white } };
+        heading.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: red } };
+        heading.alignment = { vertical: 'middle' };
+        ws.getRow(row).height = 24;
+        row++;
+        for (const item of block.r) {
+          const label = ws.getCell(row, 1), value = ws.getCell(row, 2);
+          label.value = item[0] || '';
+          value.value = A.valRaw(item[1]);
+          const bg = row % 2 === 0 ? light : white;
+          label.font = { name: 'Arial', size: 10, bold: true, color: { argb: navy } };
+          value.font = { name: 'Arial', size: 10, color: { argb: '202833' } };
+          label.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+          value.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+          label.alignment = { vertical: 'top', wrapText: true };
+          value.alignment = { vertical: 'top', wrapText: true };
+          for (let c = 1; c <= 2; c++) ws.getCell(row, c).border = { bottom: { style: 'hair', color: { argb: 'D8DEE8' } } };
+          const valueText = String(value.value == null ? '' : value.value);
+          ws.getRow(row).height = Math.max(21, Math.min(72, 16 * Math.ceil(valueText.length / 75)));
+          row++;
+        }
+        row++;
+      }
+      ws.headerFooter.oddFooter = '&LCorti-Fer · Ficha de registro de cliente&R&Página &P de &N';
+      ws.pageSetup.margins = { left: 0.3, right: 0.3, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 };
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob), a = document.createElement('a');
+      a.href = url;
+      a.download = 'Registro ' + r.nro + ' - ' + String(r.razon || 'Cliente').replace(/[^\w\- ]+/g, '').trim().slice(0, 40) + '.xlsx';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    } catch (err) { A.toast((err.message || 'Error al generar Excel') + ' Usá "Copiar fila".', 4000); }
     finally { btn.disabled = false; }
   }
 
