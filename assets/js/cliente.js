@@ -8,7 +8,7 @@
  * - El CUIT se consulta al servidor apenas es válido. Si ya está registrado se AVISA (no se bloquea:
  *   un cliente puede dar de alta otra sucursal con el mismo CUIT). También se avisa si es un CUIL /
  *   CUIT de persona física.
- * - El nombre y apellido del vendedor / viajante es obligatorio.
+ * - El nombre y apellido del vendedor / viajante es opcional.
  */
 (function () {
   'use strict';
@@ -37,7 +37,7 @@
       if (!A.cuitOk(v)) return 'Este CUIT no es válido. Revisá los 11 números.';
       return '';
     },
-    vendedor: (v) => !req(v) ? 'Escribí el nombre y apellido de tu vendedor o viajante.' : (A.nombreOk(v) ? '' : 'Escribí nombre y apellido (por ejemplo: Juan Pérez).'),
+    vendedor: (v) => !req(v) || A.nombreOk(v) ? '' : 'Si lo completás, ingresá nombre y apellido (por ejemplo: Juan Pérez).',
     email: (v) => !req(v) ? 'Ingresá un email.' : (A.mailOk(v) ? '' : 'Falta algo en el email, por ejemplo @ o el dominio.'),
     movil: (v) => !req(v) ? 'Ingresá un teléfono móvil.' : (A.phoneOk(v) ? '' : TEL),
     otroTel: (v) => !req(v) || A.phoneOk(v) ? '' : TEL,
@@ -50,6 +50,7 @@
     entProv: (v) => D.mismoDom || req(v) ? '' : 'Elegí la provincia.',
     entCP: (v) => D.mismoDom ? '' : (!req(v) ? 'Ingresá el código postal.' : (A.cpOk(v) ? '' : CP)),
     entTel: (v) => !req(v) || A.phoneOk(v) ? '' : TEL,
+    transporteOtro: (v) => D.transporte !== 'Otro' || req(v) ? '' : 'Escribí el nombre del transporte seleccionado como Otro.',
     iva: (v) => req(v) ? '' : 'Elegí la condición ante el IVA.',
     convenio: (v) => req(v) ? '' : 'Indicá si sos contribuyente de Convenio Multilateral.',
     convNro: (v) => D.convenio !== 'Sí' || req(v) ? '' : 'Ingresá el número de inscripción en Convenio Multilateral.'
@@ -60,7 +61,7 @@
   }
   const STEPKEYS = [
     ['razon', 'cuit', 'email', 'movil', 'otroTel', 'vendedor', 'domCalle', 'domCiudad', 'domProv', 'domCP'],
-    ['entCalle', 'entCiudad', 'entProv', 'entCP', 'entTel'],
+    ['entCalle', 'entCiudad', 'entProv', 'entCP', 'entTel', 'transporte', 'transporteOtro'],
     ['rt1', 'rt2', 'rt3', 'bt1', 'bt2', 'bt3'],
     ['iva', 'convenio', 'convNro'],
     []
@@ -121,7 +122,7 @@
       fld('movil', 'Teléfono móvil', { type: 'tel', ac: 'tel-national', inputmode: 'tel', ph: '3416004728', span: 'c3', hint: 'Con código de área, sin 0 ni 15.' }) +
       fld('otroTel', 'Otro teléfono', { type: 'tel', inputmode: 'tel', opt: 1, span: 'c3' }) +
       '</div><div class="sec">Tu vendedor en Corti-Fer</div><div class="grid">' +
-      fld('vendedor', 'Vendedor / viajante', { ac: 'off', ph: 'Nombre y apellido', hint: 'Nombre y apellido de la persona de Corti-Fer que te atiende.', max: 80 }) +
+      fld('vendedor', 'Vendedor / viajante', { ac: 'off', ph: 'Nombre y apellido (opcional)', hint: 'Si lo sabés, indicá quién te atiende en Corti-Fer.', max: 80, opt: true }) +
       '</div><div class="sec">Domicilio legal</div><div class="grid">' +
       fld('domCalle', 'Calle y número', { ac: 'address-line1', max: 200 }) +
       fld('domCiudad', 'Ciudad', { ac: 'address-level2', span: 'c3', max: 200 }) +
@@ -134,8 +135,8 @@
       '<div class="grid" id="entGrid"' + (D.mismoDom ? ' hidden' : '') + '>' +
       fld('entCalle', 'Calle y número', { max: 200 }) + fld('entCiudad', 'Ciudad', { span: 'c3', max: 200 }) + fld('entProv', 'Provincia', { type: 'select', opts: A.PROV, span: 'c3' }) +
       fld('entCP', 'Código postal', { span: 'c2 keep', max: 8 }) + fld('entTel', 'Teléfono de contacto en destino', { type: 'tel', opt: 1, span: 'c4', inputmode: 'tel' }) + '</div>' +
-      '<div class="grid gap-top">' + fld('transporte', 'Transporte', { list: 'dlTr', hint: 'Elegí uno de la lista o escribí el tuyo.', opt: 1, max: 200 }) + '</div>' +
-      '<datalist id="dlTr">' + A.TRANSP.map((x) => '<option value="' + esc(x) + '">').join('') + '</datalist>';
+      '<div class="grid gap-top">' + fld('transporte', 'Transporte', { type: 'select', opts: A.TRANSP, hint: 'Seleccioná el transporte de la lista.', opt: 1 }) +
+      '<div id="transporteOtroBox" class="f c6" data-f="transporteOtro"' + (D.transporte === 'Otro' ? '' : ' hidden') + '><label for="transporteOtro">¿Qué transporte? <span class="req">(obligatorio)</span></label><input id="transporteOtro" data-k="transporteOtro" type="text" maxlength="200" value="' + esc(D.transporteOtro || '') + '" placeholder="Escribí el nombre del transporte" aria-describedby="e_transporteOtro"><span class="err" id="e_transporteOtro"></span></div></div>';
 
     if (s === 2) {
       let h = '<h2>Referencias</h2><p class="lead">Si tenés a mano, cargá al menos dos comerciales. Podés dejar las bancarias para después.</p><div class="sec">Referencias comerciales</div><div class="reflist">';
@@ -359,6 +360,7 @@
       if (A.cuitOk(D.cuit)) { softCheck('cuit'); checkCuitSoon(); } else cuitWarn();
     }
     if (k === 'mismoDom') $('#entGrid').hidden = D.mismoDom;
+    if (k === 'transporte') { const ob = $('#transporteOtroBox'); if (ob) ob.hidden = D.transporte !== 'Otro'; if (D.transporte !== 'Otro') setErr('transporteOtro', ''); else if (!req(D.transporteOtro)) setErr('transporteOtro', 'Escribí el nombre del transporte seleccionado como Otro.'); }
     if (k === 'convenio') { $('#convBox').hidden = D.convenio !== 'Sí'; setErr('convenio', ''); }
     if (k === 'iva') $('#exBox').hidden = D.iva !== 'Exento';
     const w = t.closest('.f'); if (w && w.classList.contains('bad') && k !== 'cuit') softCheck(k);

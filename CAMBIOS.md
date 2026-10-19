@@ -171,3 +171,10 @@ Ahora se aplica la regla correcta. Si el cálculo da 10, ese número no existe, 
   - sin errores de JavaScript
 
 **Falta probarlo en tu cuenta real de Google** (permisos, emails reales y Drive). Ver los pasos en el README.
+
+
+## Ajuste de validación — Vendedor opcional
+- El campo «Vendedor / viajante» ya no es obligatorio en el formulario.
+- Si queda vacío, el formulario permite avanzar y enviar la solicitud.
+- Si se completa, se valida que tenga nombre y apellido.
+- El servidor también acepta el campo vacío para evitar rechazos al guardar.

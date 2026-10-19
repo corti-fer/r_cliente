@@ -11,7 +11,7 @@
  *   no se bloquea, se AVISA al cliente, a administración (email y panel) y se anota en la planilla.
  * - También se avisa cuando el número es de persona física (CUIL / CUIT de persona: prefijos 20-27).
  * - El número de cliente es obligatorio para dar de alta y NO puede repetirse.
- * - El nombre y apellido del vendedor / viajante es obligatorio.
+ * - El nombre y apellido del vendedor / viajante es opcional.
  *
  * Propiedades del script (Configuración del proyecto > Propiedades del script). setup() crea las que faltan:
  *   ADMIN_KEY        clave del panel de administración
@@ -404,7 +404,7 @@ function validate_(d) {
   if (!d.razon) e.push('razón social');
   if (!cuitOk_(d.cuit)) e.push('CUIT');
   if (!isMail_(d.email)) e.push('email');
-  if (!nombreOk_(d.vendedor)) e.push('nombre y apellido del vendedor / viajante');
+  if (d.vendedor && !nombreOk_(d.vendedor)) e.push('nombre y apellido del vendedor / viajante');
   if (d.movil.length !== 10) e.push('teléfono móvil');
   if (!d.domCalle || !d.domCiudad || !d.domProv || !cp(d.domCP)) e.push('domicilio legal');
   if (!d.mismoDom && (!d.entCalle || !d.entCiudad || !d.entProv || !cp(d.entCP))) e.push('domicilio de entrega');

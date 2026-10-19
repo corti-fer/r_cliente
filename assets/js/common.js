@@ -10,7 +10,7 @@
 
   const PROV = ['CABA', 'Buenos Aires', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba', 'Corrientes', 'Entre Ríos', 'Formosa', 'Jujuy', 'La Pampa', 'La Rioja', 'Mendoza', 'Misiones', 'Neuquén', 'Río Negro', 'Salta', 'San Juan', 'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego', 'Tucumán'];
   const IVA = ['Responsable Inscripto', 'Monotributo', 'Exento', 'No Responsable', 'Consumidor Final'];
-  const TRANSP = ['Cruz del Sur', 'Vía Cargo', 'Andreani', 'OCA', 'Correo Argentino', 'Expreso propio del cliente', 'Retira en depósito'];
+  const TRANSP = ['Acosta Pack', 'Almafuerte', 'Carolina Rapiflet', 'Cen. Argentino', 'Chilecito', 'Comisiones Furlan', 'Comisiones Johansen', 'Credifin', 'Centro Logístico Red Fox', 'Cruz del Sur', 'Expreso Biletta', 'Expreso Líder', 'Expreso Rivadavia', 'Hacha de Piedra', 'La Sevillanita', 'La Transportadora', 'Logística Dean Funes', 'Logística Pampeana - Expreso Rocinante', 'Logística Pampeana', 'MP Logística', 'Pampa SRL', 'Piloni', 'Rodríguez Hnos', 'Snaider', 'Sol Cuyano', 'Tomassini', 'Transporte El Mago', 'Transporte Gonzalo', 'Transporte HD', 'Transporte Maravilla', 'Transporte Mosto', 'Transporte Omega', 'Expreso Ríos del Sur', 'Villa Logística', 'Otro'].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
   const FILE_KEYS = ['cm05', 'f1276', 'exencion'];
 
   const $ = (s, r) => (r || document).querySelector(s);
@@ -74,7 +74,7 @@
       mismoDom: m,
       entCalle: up(m ? D.domCalle : D.entCalle), entCiudad: up(m ? D.domCiudad : D.entCiudad),
       entProv: tr(m ? D.domProv : D.entProv), entCP: up(m ? D.domCP : D.entCP),
-      entTel: phone(D.entTel), transporte: tr(D.transporte),
+      entTel: phone(D.entTel), transporte: tr(D.transporte) === 'Otro' ? tr(D.transporteOtro) : tr(D.transporte),
       iva: tr(D.iva), convenio: tr(D.convenio),
       convNro: D.convenio === 'Sí' ? tr(D.convNro) : ''
     };
