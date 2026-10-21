@@ -52,10 +52,10 @@ apps-script/appsscript.json   manifiesto de Apps Script
 4. **GitHub:** reemplazá todos los archivos del repositorio por los de esta carpeta. Borrá `assets/img/logo-corti-fer.svg`, `logo-corti-fer.png` y `favicon.png` (ya no se usan) y los README viejos.
    - `config.js` ya tiene tu URL `/exec`.
    - En `index.html`, cambiá `TU-SITIO` en la línea `og:image` por la dirección real del sitio (es para la vista previa en WhatsApp).
-5. Abrí la URL `/exec` en el navegador: tiene que responder `"version":"3.2"`.
+5. Abrí la URL `/exec` en el navegador: tiene que responder `"version":"3.3"`.
 6. Probá con los pasos de "Prueba antes de mandarlo a clientes", más abajo.
 
-> **Cada vez que cambies algo en los archivos de la web**, subí el número `?v=3.2` en `index.html` y `admin/index.html` (por ejemplo a `?v=3.3`). Así nadie se queda con la versión vieja en caché.
+> **Cada vez que cambies algo en los archivos de la web**, subí el número `?v=3.3` en `index.html` y `admin/index.html` (por ejemplo a `?v=3.3`). Así nadie se queda con la versión vieja en caché.
 > **Si cambiás `Code.gs`**, actualizá `API_VERSION` en `Code.gs` y en `config.js` con el mismo número.
 
 ## Instalación desde cero

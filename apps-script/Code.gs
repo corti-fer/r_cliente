@@ -375,7 +375,6 @@ function mailAlta_(r) {
     '<p>Gracias por elegirnos,<br>' + CONF.EMPRESA + '</p>';
   MailApp.sendEmail({
     to: r.email,
-    cc: VIAJANTES_MAIL_[r.vendedor] || '',
     name: CONF.EMPRESA,
     subject: 'Tu cuenta en ' + CONF.EMPRESA + ' está activa · Cliente N° ' + r.nroCliente,
     htmlBody: wrap_(html),
@@ -383,6 +382,35 @@ function mailAlta_(r) {
       'Número de cliente: ' + r.nroCliente + '\nCUIT: ' + fmtCuit_(r.cuit) + '\n\n' +
       'Creá tu usuario en: ' + CONF.URL_REGISTRO + '\n\n' + CONF.EMPRESA
   });
+
+  // Notificación comercial independiente para el viajante asignado.
+  // No se incluye al viajante en copia del correo del cliente para evitar exponerle
+  // un mensaje dirigido al cliente y poder darle instrucciones específicas de gestión.
+  const destinatario = VIAJANTES_MAIL_[r.vendedor];
+  if (destinatario) {
+    const datos = [
+      ['Razón social', r.razon], ['Nombre de fantasía', r.fantasia],
+      ['Número de cliente', r.nroCliente], ['CUIT / CUIL', fmtCuit_(r.cuit)],
+      ['Email del cliente', r.email], ['Teléfono', r.movil],
+      ['Localidad', [r.domCiudad, r.domProv].filter(Boolean).join(', ')],
+      ['Domicilio', r.domCalle], ['Transporte', r.transporte],
+      ['Viajante asignado', r.vendedor], ['Estado', 'Dada de alta']
+    ];
+    const cuerpo = '<p>Hola ' + h_(r.vendedor) + ',</p>' +
+      '<p>Se confirmó el alta de este cliente y quedó asociado a tu cartera. Te compartimos los datos para que puedas realizar el seguimiento comercial.</p>' +
+      tableHtml_(datos) +
+      '<p>Por favor, contactá al cliente para darle la bienvenida y acompañarlo en sus primeros pedidos.</p>' +
+      '<p>Saludos,<br><b>Equipo ' + h_(CONF.EMPRESA) + '</b></p>';
+    MailApp.sendEmail({
+      to: destinatario,
+      name: CONF.EMPRESA + ' · Altas de clientes',
+      subject: 'Cliente asignado a tu cartera: ' + r.razon + ' · N° ' + r.nroCliente,
+      htmlBody: wrap_(cuerpo),
+      body: 'Hola ' + r.vendedor + ',\n\nSe confirmó el alta de este cliente y quedó asociado a tu cartera.\n\n' +
+        datos.map(function (x) { return x[0] + ': ' + (x[1] || '—'); }).join('\n') +
+        '\n\nContactá al cliente para darle la bienvenida y acompañarlo en sus primeros pedidos.\n\nEquipo ' + CONF.EMPRESA
+    });
+  }
 }
 
 function wrap_(inner) {
