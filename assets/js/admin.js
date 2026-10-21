@@ -11,6 +11,7 @@
   const A = window.Alta, $ = A.$, esc = A.esc;
   const KEY_SS = 'altaAdmin.key';
   const ESTADOS = ['Nueva', 'En revisión', 'Dada de alta', 'Rechazada'];
+  const VIAJANTES = ['Rodriguez Saez, Claudio Daniel','Vega Gastón Exequiel','Fogel Gustavo Ariel','Romero Ramiro Pedro Francisco','Quiroga Leopoldo','Baudena Lucas','Bedeschi Palmiro','Alba Aab Martin Miguel','Decima Jose','Roldan Burgoa Lucas','Proserpio Pablo','Angulo Julio Cesar','Córdoba Fernando','Liva Diego','Weimer Leandro','Matviuk Lucas','Maxit Hugo','Lelli Sebastian','Cortifer'];
   const ESTADOS_MANUALES = ['Nueva', 'En revisión', 'Rechazada'];
   const PILL = { 'Nueva': 'nueva', 'En revisión': 'rev', 'Dada de alta': 'ok', 'Rechazada': 'gris' };
   const EXCELJS_URL = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
@@ -162,9 +163,11 @@
     return '';
   }
   function nroField(r, btnHtml) {
+    const opts = ['<option value="">Seleccioná un viajante (obligatorio)</option>'].concat(VIAJANTES.map((v) => '<option value="' + esc(v) + '"' + (String(r.vendedor || '').trim().toLocaleLowerCase('es') === v.toLocaleLowerCase('es') ? ' selected' : '') + '>' + esc(v) + '</option>')).join('');
     return '<div class="nrocli"><div class="f"><label for="nroCli">Número de cliente en Magnus</label>' +
-      '<div class="inline"><input id="nroCli" class="mono" type="text" autocapitalize="characters" spellcheck="false" autocomplete="off" maxlength="20" placeholder="Ej. 10458" value="' + esc(r.nroCliente || '') + '" aria-describedby="nroCliErr">' + btnHtml + '</div>' +
-      '<span class="err" id="nroCliErr" role="alert"></span></div></div>';
+      '<div class="inline"><input id="nroCli" class="mono" type="text" autocapitalize="characters" spellcheck="false" autocomplete="off" maxlength="20" placeholder="Ej. 10458" value="' + esc(r.nroCliente || '') + '" aria-describedby="nroCliErr"></div>' +
+      '<span class="err" id="nroCliErr" role="alert"></span></div>' +
+      '<div class="f"><label for="viajanteAlta">Viajante / vendedor asignado <span aria-hidden="true">*</span></label><select id="viajanteAlta" required>' + opts + '</select><span class="err" id="viajanteErr" role="alert"></span><small>Se guardará esta selección en lugar del texto ingresado originalmente y recibirá copia del email de alta.</small></div>' + btnHtml + '</div>';
   }
   function altaBox(r) {
     if (r.estado === 'Dada de alta' && r.notificado) {
@@ -245,19 +248,23 @@
     if (msg) $('#nroCli').focus();
   }
   function doAlta(t, force) {
-    const r = CUR, inp = $('#nroCli');
+    const r = CUR, inp = $('#nroCli'), sel = $('#viajanteAlta');
     const v = A.normNroCliente(inp ? inp.value : r.nroCliente);
+    const viajante = sel ? sel.value : '';
+    const ve = $('#viajanteErr');
+    if (!viajante || VIAJANTES.indexOf(viajante) < 0) { if (ve) ve.textContent = 'Seleccioná un viajante de la lista.'; if (sel) sel.focus(); return; }
+    if (ve) ve.textContent = ''; 
     const m = nroClienteError(r, v);
     if (m) { showNroErr(m); return; }
     showNroErr('');
     const txt = force
-      ? '¿Enviar el email de alta a ' + r.email + '?\n\nNúmero de cliente: ' + v
+      ? '¿Reenviar el email de alta a ' + r.email + ' con copia a ' + viajante + '?\n\nNúmero de cliente: ' + v
       : 'Vas a dar de alta a:\n\n' + r.razon + '\nCUIT ' + A.fmtCuit(r.cuit) + (A.esPersona(r.cuit) ? ' (persona física / CUIL)' : '') + '\nNúmero de cliente: ' + v +
         (otherSameCuit(r).some((s) => s.estado === 'Dada de alta') ? '\n\nATENCIÓN: este CUIT ya es cliente (N° ' + otherSameCuit(r).filter((s) => s.nroCliente).map((s) => s.nroCliente).join(', ') + '). Se crea otra cuenta para esta sucursal.' : '') +
-        '\n\nSe le envía un email a ' + r.email + ' con el número de cliente y el enlace para crear su usuario.\n\n¿Continuar?';
+        '\n\nSe le envía un email a ' + r.email + ' con copia a ' + viajante + '.\n\n¿Continuar?';
     if (!confirm(txt)) return;
     act(async () => {
-      const res = await call('approve', { nro: r.nro, nroCliente: v, force: !!force }, 60000);
+      const res = await call('approve', { nro: r.nro, nroCliente: v, vendedor: viajante, force: !!force }, 60000);
       replaceItem(res.item, force ? 'Email enviado.' : 'Cliente dado de alta. Email enviado.');
     }, t, 'Enviando…');
   }

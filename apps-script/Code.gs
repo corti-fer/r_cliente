@@ -1,5 +1,5 @@
 /**
- * Alta de clientes Corti-Fer — servidor en Google Apps Script.  Versión 3.2 (2026-10-16)
+ * Alta de clientes Corti-Fer — servidor en Google Apps Script.  Versión 3.3 (2026-10-21)
  *
  * - Base de datos: hoja "Solicitudes" de la planilla vinculada a este script.
  * - Adjuntos: una subcarpeta de Drive por solicitud.
@@ -11,7 +11,7 @@
  *   no se bloquea, se AVISA al cliente, a administración (email y panel) y se anota en la planilla.
  * - También se avisa cuando el número es de persona física (CUIL / CUIT de persona: prefijos 20-27).
  * - El número de cliente es obligatorio para dar de alta y NO puede repetirse.
- * - El nombre y apellido del vendedor / viajante es opcional.
+ * - El viajante se selecciona obligatoriamente en administración al dar de alta y recibe copia del email de alta.
  *
  * Propiedades del script (Configuración del proyecto > Propiedades del script). setup() crea las que faltan:
  *   ADMIN_KEY        clave del panel de administración
@@ -21,7 +21,7 @@
  *   SEND_RECEIPT     "si" / "no": acuse de recibo al cliente
  */
 
-const API_VERSION = '3.2';
+const API_VERSION = '3.3';
 
 const CONF = {
   SHEET_NAME: 'Solicitudes',
@@ -89,7 +89,7 @@ function doPost(e) {
       case 'list': auth_(body.key); out = list_(); break;
       case 'setEstado': auth_(body.key); out = setEstado_(body.nro, body.estado); break;
       case 'setObs': auth_(body.key); out = setObs_(body.nro, body.obs); break;
-      case 'approve': auth_(body.key); out = approve_(body.nro, body.nroCliente, !!body.force); break;
+      case 'approve': auth_(body.key); out = approve_(body.nro, body.nroCliente, !!body.force, body.vendedor); break;
       default: out = { ok: false, error: 'Acción desconocida. ¿Está actualizada la implementación?', code: 'BAD_ACTION' };
     }
     out.version = API_VERSION;
@@ -256,8 +256,31 @@ function setObs_(nro, obs) {
   });
 }
 
+/* Lista autorizada de viajantes y destinatarios para la copia del email de alta. */
+const VIAJANTES_MAIL_ = {
+  'Rodriguez Saez, Claudio Daniel': 'claudiusroca14@gmail.com',
+  'Vega Gastón Exequiel': 'gaston_cjs9@hotmail.com',
+  'Fogel Gustavo Ariel': 'gustavofogel.cf@gmail.com',
+  'Romero Ramiro Pedro Francisco': 'ramiroromero315@gmail.com',
+  'Quiroga Leopoldo': 'lpv_qt7@hotmail.com',
+  'Baudena Lucas': 'lucasbaudena@hotmail.com',
+  'Bedeschi Palmiro': 'palmirobedeschi@gmail.com',
+  'Alba Aab Martin Miguel': 'cortifer.martin@gmail.com',
+  'Decima Jose': 'jose535decima@outlook.com,josegustavodecima@gmail.com',
+  'Roldan Burgoa Lucas': 'lucas.cortifer@gmail.com',
+  'Proserpio Pablo': 'pproserpio7@gmail.com',
+  'Angulo Julio Cesar': 'julio.cortifer@gmail.com',
+  'Córdoba Fernando': 'elviajante222@hotmail.com',
+  'Liva Diego': 'diegocortifer@gmail.com',
+  'Weimer Leandro': 'volarnano@gmail.com',
+  'Matviuk Lucas': 'lukasmat@gmail.com',
+  'Maxit Hugo': 'hmaxit@gmail.com',
+  'Lelli Sebastian': 'sebastianlelli@yahoo.com.ar',
+  'Cortifer': 'ecommercecortifer@gmail.com'
+};
+
 /* Dar de alta (o reenviar el email de alta). El alta queda guardada aunque el email falle. */
-function approve_(nro, nroCliente, force) {
+function approve_(nro, nroCliente, force, vendedor) {
   return withLock_(function () {
     const T = table_();
     const f = findIn_(T, nro);
@@ -265,6 +288,9 @@ function approve_(nro, nroCliente, force) {
     if (r.estado === 'Rechazada') fail_('La solicitud está rechazada. Pasala a "En revisión" antes de darla de alta.', 'STATE');
     if (r.notificado && !force) fail_('El email de alta ya se envió el ' + r.notificado + '. Usá "Reenviar email".', 'ALREADY');
     if (!isMail_(r.email)) fail_('El email del cliente no es válido. Corregilo en la planilla.', 'VALIDATION');
+    vendedor = String(vendedor || '').trim();
+    const destinatariosViajante = VIAJANTES_MAIL_[vendedor];
+    if (!destinatariosViajante) fail_('Seleccioná un viajante válido de la lista antes de dar el alta.', 'TRAVELER');
 
     nroCliente = normNroCliente_(nroCliente || r.nroCliente);
     if (!nroCliente) fail_('Ingresá el número de cliente.', 'CLIENT_NUMBER');
@@ -277,7 +303,7 @@ function approve_(nro, nroCliente, force) {
     });
 
     const hist = (r.historialEmails ? r.historialEmails + '\n' : '') + now_() + ' · envío a ' + r.email + ' (cliente ' + nroCliente + ')';
-    r = writeRec_(T, f, { estado: 'Dada de alta', nroCliente: nroCliente, fechaAlta: r.fechaAlta || now_(), historialEmails: hist + ' · enviando…' });
+    r = writeRec_(T, f, { estado: 'Dada de alta', nroCliente: nroCliente, vendedor: vendedor, fechaAlta: r.fechaAlta || now_(), historialEmails: hist + ' · copia a ' + destinatariosViajante + ' · enviando…' });
     SpreadsheetApp.flush();
 
     try {
@@ -349,6 +375,7 @@ function mailAlta_(r) {
     '<p>Gracias por elegirnos,<br>' + CONF.EMPRESA + '</p>';
   MailApp.sendEmail({
     to: r.email,
+    cc: VIAJANTES_MAIL_[r.vendedor] || '',
     name: CONF.EMPRESA,
     subject: 'Tu cuenta en ' + CONF.EMPRESA + ' está activa · Cliente N° ' + r.nroCliente,
     htmlBody: wrap_(html),
