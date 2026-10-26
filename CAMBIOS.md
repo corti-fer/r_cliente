@@ -178,3 +178,12 @@ Ahora se aplica la regla correcta. Si el cálculo da 10, ese número no existe, 
 - Si queda vacío, el formulario permite avanzar y enviar la solicitud.
 - Si se completa, se valida que tenga nombre y apellido.
 - El servidor también acepta el campo vacío para evitar rechazos al guardar.
+
+
+## Versión 3.4 — instructivos, referencia comercial y privacidad del CUIT
+
+- El email de alta incluye enlaces al instructivo de registro y a la guía de cómo comprar.
+- Se exige al menos una referencia comercial con nombre y teléfono; se valida tanto en el formulario como en Apps Script.
+- El formulario público ya no consulta ni muestra si el CUIT está registrado o tiene una solicitud en curso. El endpoint público legado tampoco devuelve ese estado; administración debe revisar los duplicados desde el panel autenticado.
+- Los PDF se publican en `assets/docs/`. Al actualizar GitHub Pages, confirmar que ambos enlaces abran correctamente.
+- Actualizar Apps Script a la versión 3.4 y desplegar una nueva versión; también subir los archivos del sitio al repositorio.

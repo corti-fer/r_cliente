@@ -21,7 +21,7 @@
  *   SEND_RECEIPT     "si" / "no": acuse de recibo al cliente
  */
 
-const API_VERSION = '3.3';
+const API_VERSION = '3.4';
 
 const CONF = {
   SHEET_NAME: 'Solicitudes',
@@ -164,13 +164,9 @@ function submit_(body) {
 /* Consulta rápida desde el formulario: ¿este CUIT ya está registrado? ¿es de persona física?
    Solo informa: no bloquea nada (un cliente puede sumar sucursales con el mismo CUIT). */
 function checkCuit_(cuit) {
-  cuit = String(cuit || '').replace(/\D/g, '');
-  if (!cuitOk_(cuit)) return { ok: true, estado: 'invalido' };
-  const recs = table_().recs.filter(function (r) { return r.cuit === cuit && r.estado !== 'Rechazada'; });
-  const out = { ok: true, tipo: tipoCuit_(cuit), estado: 'libre' };
-  if (recs.some(function (r) { return r.estado === 'Dada de alta'; })) out.estado = 'cliente';
-  else if (recs.length) out.estado = 'en_curso';
-  return out;
+  // Endpoint público legado: no revela si un CUIT existe en la base.
+  // Los duplicados se revisan exclusivamente desde el panel autenticado.
+  return { ok: true, estado: 'no_consultado' };
 }
 
 /* "Persona física (CUIL)" para prefijos 20–27, "Empresa" para 30/33/34. */
@@ -371,7 +367,10 @@ function mailAlta_(r) {
     tableHtml_([['Número de cliente', r.nroCliente], ['CUIT', fmtCuit_(r.cuit)], ['Razón social', r.razon]].concat(r.vendedor ? [['Tu vendedor', r.vendedor]] : [])) +
     '<p>Para ver precios y hacer pedidos, creá tu usuario en nuestra web con estos datos y este mismo email:</p>' +
     button_(CONF.URL_REGISTRO, 'Crear mi cuenta') +
-    '<p style="font-size:13px;color:#555">Si el botón no funciona, copiá este enlace en el navegador:<br>' + h_(CONF.URL_REGISTRO) + '</p>' +
+    '<p><b>Te recomendamos consultar estos instructivos:</b></p>' +
+    '<ul><li><a href="https://corti-fer.github.io/r_cliente/assets/docs/instructivo-registro.pdf">Instructivo para registrarte en la web</a></li>' +
+    '<li><a href="https://corti-fer.github.io/r_cliente/assets/docs/guia-como-comprar.pdf">Guía paso a paso: cómo comprar</a></li></ul>' +
+    '<p style="font-size:13px;color:#555">Si el botón de registro no funciona, copiá este enlace en el navegador:<br>' + h_(CONF.URL_REGISTRO) + '</p>' +
     '<p>Gracias por elegirnos,<br>' + CONF.EMPRESA + '</p>';
   MailApp.sendEmail({
     to: r.email,
@@ -380,7 +379,9 @@ function mailAlta_(r) {
     htmlBody: wrap_(html),
     body: 'Hola ' + nombre + ',\n\nTu cuenta de cliente en ' + CONF.EMPRESA + ' ya está dada de alta.\n' +
       'Número de cliente: ' + r.nroCliente + '\nCUIT: ' + fmtCuit_(r.cuit) + '\n\n' +
-      'Creá tu usuario en: ' + CONF.URL_REGISTRO + '\n\n' + CONF.EMPRESA
+      'Creá tu usuario en: ' + CONF.URL_REGISTRO + '\n\n' +
+      'Instructivo de registro: https://corti-fer.github.io/r_cliente/assets/docs/instructivo-registro.pdf\n' +
+      'Guía de cómo comprar: https://corti-fer.github.io/r_cliente/assets/docs/guia-como-comprar.pdf\n\n' + CONF.EMPRESA
   });
 
   // Notificación comercial independiente para el viajante asignado.
@@ -461,6 +462,7 @@ function validate_(d) {
   if (!isMail_(d.email)) e.push('email');
   if (d.vendedor && !nombreOk_(d.vendedor)) e.push('nombre y apellido del vendedor / viajante');
   if (d.movil.length !== 10) e.push('teléfono móvil');
+  if (![1, 2, 3].some(function (i) { return !!String(d['rn' + i] || '').trim() && !!String(d['rt' + i] || '').trim(); })) e.push('al menos una referencia comercial con nombre y teléfono');
   if (!d.domCalle || !d.domCiudad || !d.domProv || !cp(d.domCP)) e.push('domicilio legal');
   if (!d.mismoDom && (!d.entCalle || !d.entCiudad || !d.entProv || !cp(d.entCP))) e.push('domicilio de entrega');
   if (['Responsable Inscripto', 'Monotributo', 'Exento', 'No Responsable', 'Consumidor Final'].indexOf(d.iva) < 0) e.push('condición ante el IVA');

@@ -14,7 +14,7 @@
   'use strict';
   const A = window.Alta, $ = A.$, esc = A.esc, req = A.req;
   const STEPS = ['Cliente', 'Entrega', 'Referencias', 'Impositivo', 'Revisar'];
-  const DRAFT = 'altaCliente.draft.v3';
+  const DRAFT = 'altaCliente.draft.v4';
   const OLD_DRAFTS = ['altaCliente.draft'];
   const DRAFT_MS = (A.CFG.DRAFT_DAYS || 3) * 86400000;
   const MAX_FILE = (A.CFG.MAX_FILE_MB || 5) * 1024 * 1024;
@@ -68,22 +68,12 @@
   ];
   const stepHasErrors = (s) => STEPKEYS[s].some((k) => RULES[k] && RULES[k](D[k]));
 
-  /* ---------- Consulta de CUIT en el servidor (no bloquea si falla) ---------- */
-  function checkCuitSoon() {
-    clearTimeout(cuitTimer);
-    const c = cuitDigits();
-    if (!A.cuitOk(c) || CUIT_ST[c]) return;
-    cuitTimer = setTimeout(async () => {
-      CUIT_ST[c] = { estado: 'consultando' };
-      try {
-        const r = await A.api({ action: 'checkCuit', cuit: c }, { timeout: 12000 });
-        CUIT_ST[c] = { estado: r.estado };
-      } catch (err) {
-        delete CUIT_ST[c];   // sin conexión: el servidor lo vuelve a controlar al enviar
-        return;
-      }
-      if (cuitDigits() === c && step === 0) cuitWarn();
-    }, 350);
+  /* No se consulta ni se informa al solicitante si el CUIT ya está registrado.
+     La revisión de CUIT duplicados queda exclusivamente en el panel de administración. */
+  function checkCuitSoon() {}
+  function cuitWarn() {
+    const w = $('#w_cuit');
+    if (w) { w.innerHTML = ''; w.hidden = true; }
   }
 
   /* ---------- Plantillas ---------- */
@@ -139,7 +129,7 @@
       '<div id="transporteOtroBox" class="f c6" data-f="transporteOtro"' + (D.transporte === 'Otro' ? '' : ' hidden') + '><label for="transporteOtro">¿Qué transporte? <span class="req">(obligatorio)</span></label><input id="transporteOtro" data-k="transporteOtro" type="text" maxlength="200" value="' + esc(D.transporteOtro || '') + '" placeholder="Escribí el nombre del transporte" aria-describedby="e_transporteOtro"><span class="err" id="e_transporteOtro"></span></div></div>';
 
     if (s === 2) {
-      let h = '<h2>Referencias</h2><p class="lead">Si tenés a mano, cargá al menos dos comerciales. Podés dejar las bancarias para después.</p><div class="sec">Referencias comerciales</div><div class="reflist">';
+      let h = '<h2>Referencias</h2><p class="lead">La referencia comercial es obligatoria: completá nombre y teléfono de al menos una. Las referencias bancarias son opcionales.</p><div class="sec">Referencias comerciales</div><div class="reflist">';
       for (let i = 1; i <= 3; i++) h += '<div class="refrow">' + fld('rn' + i, 'Nombre o razón social', { span: '' }) + fld('rt' + i, 'Teléfono', { type: 'tel', inputmode: 'tel', span: '' }) + fld('rc' + i, 'Contacto', { span: '' }) + '</div>';
       h += '</div><div class="sec">Referencias bancarias</div><div class="reflist">';
       for (let i = 1; i <= 3; i++) h += '<div class="refrow">' + fld('bn' + i, 'Banco', { span: '' }) + fld('bt' + i, 'Teléfono', { type: 'tel', inputmode: 'tel', span: '' }) + fld('bc' + i, 'Contacto', { span: '' }) + '</div>';
@@ -241,6 +231,19 @@
   function validateStep(s) {
     const bad = [];
     STEPKEYS[s].forEach((k) => { const m = RULES[k] ? RULES[k](D[k]) : ''; setErr(k, m); if (m) bad.push(k); });
+    if (s === 2) {
+      const hasCommercialReference = [1, 2, 3].some((i) => req(D['rn' + i]) && req(D['rt' + i]));
+      if (!hasCommercialReference) {
+        bad.push('rn1');
+        const firstRef = document.getElementById('rn1');
+        if (firstRef) {
+          const msg = document.getElementById('e_rn1');
+          if (msg) msg.textContent = 'Cargá al menos una referencia comercial con nombre y teléfono.';
+          const wrap = firstRef.closest('.f');
+          if (wrap) wrap.classList.add('bad');
+        }
+      }
+    }
     const box = $('#errsum');
     if (box) {
       if (bad.length) {

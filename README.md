@@ -1,4 +1,4 @@
-# Alta de clientes · Corti-Fer (v3.2)
+# Alta de clientes · Corti-Fer (v3.4)
 
 Formulario web para que un cliente nuevo cargue sus datos, y un panel aparte para que administración lo revise, le asigne el número de cliente y lo dé de alta.
 
@@ -131,3 +131,8 @@ Para probar el email de alta sin un cliente real, ejecutá `probarEmailAlta`: te
 3. Abrí el link del aviso e ingresá la clave: la solicitud tiene que aparecer abierta.
 4. Cargá un número de cliente y tocá **Dar de alta y enviar email**. Te tiene que llegar el email con el número y el botón "Crear mi cuenta".
 5. Cargá el mismo CUIT como otra sucursal y dale de alta con **otro** número de cliente. Con el mismo número tiene que rechazarlo.
+
+
+## Actualización 3.4
+
+Incluye enlaces a los PDF de registro y compra en el email de alta, referencia comercial obligatoria (al menos un nombre y teléfono) y elimina la consulta pública que informaba si un CUIT ya estaba registrado. Reemplazá el contenido de Apps Script y desplegá una **nueva versión**; subí también todos los archivos del sitio, incluidos `assets/docs/`.
