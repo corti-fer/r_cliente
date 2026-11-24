@@ -101,17 +101,15 @@
       (f ? '<button type="button" class="linkbtn" data-rmfile="' + k + '">Quitar</button>' : '') + '</label></div>';
   }
 
-  /* Campo de nota: ocupa todo el ancho de la grilla y es bien grande (estilos directos,
-     para no depender de qué clases tenga el CSS). */
+  /* Campo de nota: ocupa todo el ancho de la grilla y es bien grande. El aspecto (colores, bordes)
+     está en assets/css/cliente.css (.nota-area); acá solo va lo de tamaño como respaldo. */
   const NOTA_WRAP_STYLE = 'grid-column:1 / -1;width:100%;margin-top:6px';
-  const NOTA_AREA_STYLE = 'display:block;width:100%;box-sizing:border-box;min-height:180px;padding:12px 14px;' +
-    'font:inherit;font-size:16px;line-height:1.5;border:1px solid #c9c9c9;border-radius:8px;' +
-    'background:#fff;color:inherit;resize:vertical';
+  const NOTA_AREA_STYLE = 'display:block;width:100%;box-sizing:border-box;min-height:180px;resize:vertical';
   function notaField() {
     const n = String(D.nota || '').length;
     return '<div class="f c12" data-f="nota" style="' + NOTA_WRAP_STYLE + '">' +
       '<label for="nota">Nota / Información adicional <span class="opt">(opcional)</span></label>' +
-      '<textarea id="nota" data-k="nota" rows="7" maxlength="' + MAX_NOTA + '" style="' + NOTA_AREA_STYLE + '" ' +
+      '<textarea id="nota" class="nota-area" data-k="nota" rows="7" maxlength="' + MAX_NOTA + '" style="' + NOTA_AREA_STYLE + '" ' +
       'placeholder="Podés agregar cualquier información que consideres importante para tu solicitud.">' +
       esc(D.nota || '') + '</textarea>' +
       '<span class="hint">Esta información será recibida por el equipo de administración de Corti-Fer. <span id="notaCount">' + n + '</span> / ' + MAX_NOTA + '</span>' +
