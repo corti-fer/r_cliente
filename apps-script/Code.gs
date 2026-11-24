@@ -58,7 +58,9 @@ const COLS = (function () {
   c.push(
     ['iva', 'Condición IVA'], ['convenio', 'Convenio Multilateral'], ['convNro', 'Nro. Convenio Multilateral'],
     ['cm05', 'Formulario CM05'], ['f1276', 'Formulario 1276'], ['exencion', 'Certificado de exención'], ['carpeta', 'Carpeta Drive'],
-    ['duplicado', 'Otras solicitudes mismo CUIT'], ['obs', 'Observaciones'],
+    ['duplicado', 'Otras solicitudes mismo CUIT'],
+['obs', 'Observaciones'],
+['nota', 'Nota / Información adicional'],
     ['fechaAlta', 'Fecha de alta'], ['nroCliente', 'Número de cliente'], ['notificado', 'Email de alta enviado'],
     ['historialEmails', 'Historial de notificaciones'], ['reqId', 'ID de envío'], ['tipoCuit', 'Tipo de CUIT']
   );
@@ -432,7 +434,57 @@ function tableHtml_(rows) {
  * Normalización y validación (igual que assets/js/common.js)
  * ============================================================ */
 
-function normalize_(D) {
+function function normalize_(D) {
+  const up = function (v) { return String(v || '').trim().toUpperCase().slice(0, 200); };
+  const tr = function (v) { return String(v || '').trim().slice(0, 200); };
+  const ph = function (v) { return String(v || '').replace(/\D/g, '').replace(/^0+/, '').slice(0, 15); };
+  const m = D.mismoDom === true || D.mismoDom === 'Sí';
+
+  const o = {
+    razon: up(D.razon),
+    fantasia: tr(D.fantasia),
+    cuit: String(D.cuit || '').replace(/\D/g, ''),
+    email: tr(D.email).toLowerCase(),
+    vendedor: nombre_(D.vendedor),
+    movil: ph(D.movil),
+    otroTel: ph(D.otroTel),
+
+    domCalle: up(D.domCalle),
+    domCiudad: up(D.domCiudad),
+    domProv: tr(D.domProv),
+    domCP: up(D.domCP),
+
+    mismoDom: m,
+
+    entCalle: up(m ? D.domCalle : D.entCalle),
+    entCiudad: up(m ? D.domCiudad : D.entCiudad),
+    entProv: tr(m ? D.domProv : D.entProv),
+    entCP: up(m ? D.domCP : D.entCP),
+
+    entTel: ph(D.entTel),
+    transporte: tr(D.transporte),
+
+    iva: tr(D.iva),
+    convenio: tr(D.convenio),
+    convNro: D.convenio === 'Sí' ? tr(D.convNro) : '',
+
+    // Nota opcional ingresada por el cliente al completar la solicitud.
+    // Se limita a 4000 caracteres.
+    nota: String(D.nota || '').trim().slice(0, 4000)
+  };
+
+  for (let i = 1; i <= 3; i++) {
+    o['rn' + i] = tr(D['rn' + i]);
+    o['rt' + i] = ph(D['rt' + i]);
+    o['rc' + i] = tr(D['rc' + i]);
+
+    o['bn' + i] = tr(D['bn' + i]);
+    o['bt' + i] = ph(D['bt' + i]);
+    o['bc' + i] = tr(D['bc' + i]);
+  }
+
+  return o;
+} {
   const up = function (v) { return String(v || '').trim().toUpperCase().slice(0, 200); };
   const tr = function (v) { return String(v || '').trim().slice(0, 200); };
   const ph = function (v) { return String(v || '').replace(/\D/g, '').replace(/^0+/, '').slice(0, 15); };
