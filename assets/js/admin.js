@@ -189,6 +189,9 @@
     const r = CUR;
     if (!r) { $('#detail').innerHTML = '<p class="muted">' + (LIST.length ? 'Elegí una solicitud de la lista.' : 'Todavía no hay solicitudes.') + '</p>'; return; }
     const g = A.rowsOf(r, filesOf(r));
+    const notaCliente = String(
+  r.nota || r.observaciones || r.infoAdicional || ''
+).trim();
     const pend = [];
     g.forEach((b) => b.r.forEach((x) => { if (x[1] === 'Pendiente') pend.push(x[0]); }));
     let h = '<div class="dethead"><div><h2>' + esc(r.razon) + '</h2><div class="mono sub">' + esc(r.nro) + ' · recibida ' + esc(r.fecha) + '</div>' +
@@ -201,6 +204,14 @@
       'Si es otra sucursal, dala de alta con un <b>número de cliente distinto</b>. Si es la misma, pasá esta solicitud a "Rechazada".</div>';
     if (A.esPersona(r.cuit)) h += '<div class="banner"><b>CUIL / persona física.</b> El número empieza con ' + esc(String(r.cuit).slice(0, 2)) + '. Verificá que sea el CUIT con el que factura.</div>';
     if (pend.length) h += '<div class="banner">Documentación pendiente: ' + pend.map(esc).join(', ') + '.</div>';
+if (notaCliente) {
+  h += `
+    <div class="nota-cliente">
+      <h3>Nota enviada por el cliente</h3>
+      <div class="nota-contenido">${esc(notaCliente).replace(/\r?\n/g, '<br>')}</div>
+    </div>
+  `;
+}   
     h += altaBox(r);
     g.forEach((b) => {
       if (!b.r.length) return;
