@@ -81,3 +81,26 @@
 .banner.cuitdup{border-left:4px solid var(--warn)}
 .banner ul{margin:6px 0;padding-left:18px}
 .banner li{margin:2px 0}
+
+.nota-cliente {
+  margin: 18px 0;
+  padding: 18px;
+  background: #fff8e8;
+  border: 1px solid #e8d5a8;
+  border-left: 5px solid #d69b25;
+  border-radius: 8px;
+}
+
+.nota-cliente h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  color: #493817;
+}
+
+.nota-contenido {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #292929;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
