@@ -9,6 +9,7 @@
  *   un cliente puede dar de alta otra sucursal con el mismo CUIT). También se avisa si es un CUIL /
  *   CUIT de persona física.
  * - El nombre y apellido del vendedor / viajante es opcional.
+ * - La nota / información adicional (opcional, hasta 2000 caracteres) se envía al servidor y la ve administración.
  */
 (function () {
   'use strict';
@@ -19,6 +20,7 @@
   const DRAFT_MS = (A.CFG.DRAFT_DAYS || 3) * 86400000;
   const MAX_FILE = (A.CFG.MAX_FILE_MB || 5) * 1024 * 1024;
   const MAX_TOTAL = (A.CFG.MAX_TOTAL_MB || 15) * 1024 * 1024;
+  const MAX_NOTA = 2000;   // igual que CONF.MAX_NOTA en el servidor
   const OK_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
   const URL_REGISTRO = 'https://www.corti-fer.com.ar/registracion.aspx?TipoRegistracion=1';
 
@@ -71,10 +73,6 @@
   /* No se consulta ni se informa al solicitante si el CUIT ya está registrado.
      La revisión de CUIT duplicados queda exclusivamente en el panel de administración. */
   function checkCuitSoon() {}
-  function cuitWarn() {
-    const w = $('#w_cuit');
-    if (w) { w.innerHTML = ''; w.hidden = true; }
-  }
 
   /* ---------- Plantillas ---------- */
   function fld(k, label, o) {
@@ -103,6 +101,23 @@
       (f ? '<button type="button" class="linkbtn" data-rmfile="' + k + '">Quitar</button>' : '') + '</label></div>';
   }
 
+  /* Campo de nota: ocupa todo el ancho de la grilla y es bien grande (estilos directos,
+     para no depender de qué clases tenga el CSS). */
+  const NOTA_WRAP_STYLE = 'grid-column:1 / -1;width:100%;margin-top:6px';
+  const NOTA_AREA_STYLE = 'display:block;width:100%;box-sizing:border-box;min-height:180px;padding:12px 14px;' +
+    'font:inherit;font-size:16px;line-height:1.5;border:1px solid #c9c9c9;border-radius:8px;' +
+    'background:#fff;color:inherit;resize:vertical';
+  function notaField() {
+    const n = String(D.nota || '').length;
+    return '<div class="f c12" data-f="nota" style="' + NOTA_WRAP_STYLE + '">' +
+      '<label for="nota">Nota / Información adicional <span class="opt">(opcional)</span></label>' +
+      '<textarea id="nota" data-k="nota" rows="7" maxlength="' + MAX_NOTA + '" style="' + NOTA_AREA_STYLE + '" ' +
+      'placeholder="Podés agregar cualquier información que consideres importante para tu solicitud.">' +
+      esc(D.nota || '') + '</textarea>' +
+      '<span class="hint">Esta información será recibida por el equipo de administración de Corti-Fer. <span id="notaCount">' + n + '</span> / ' + MAX_NOTA + '</span>' +
+      '</div>';
+  }
+
   function view(s) {
     if (s === 0) return '<h2>Datos del cliente</h2><p class="lead">Tal como figuran en ARCA. Son 2 minutos.</p><div class="grid">' +
       fld('razon', 'Razón social', { ac: 'organization', hint: 'Se carga en mayúsculas.', max: 200 }) +
@@ -118,14 +133,9 @@
       fld('domCiudad', 'Ciudad', { ac: 'address-level2', span: 'c3', max: 200 }) +
       fld('domProv', 'Provincia', { type: 'select', opts: A.PROV, ac: 'address-level1', span: 'c3' }) +
       fld('domCP', 'Código postal', { ac: 'postal-code', span: 'c2 keep', max: 8 }) +
-'<div class="f c12" data-f="nota">' +
-  '<label for="nota">Nota / Información adicional <span class="opt">(opcional)</span></label>' +
-  '<textarea id="nota" data-k="nota" rows="4" maxlength="4000" ' +
-  'placeholder="Podés agregar cualquier información que consideres importante para tu solicitud.">' +
-  esc(D.nota || '') +
-  '</textarea>' +
-  '<span class="hint">Esta información será recibida por el equipo de administración de Corti-Fer.</span>' +
-'</div></div>';
+      '</div><div class="sec">Información adicional</div><div class="grid">' +
+      notaField() +
+      '</div>';
 
     if (s === 1) return '<h2>Entrega de productos</h2><p class="lead">Dónde y cómo querés recibir tus pedidos.</p>' +
       '<label class="check"><input type="checkbox" id="mismoDom" data-k="mismoDom"' + (D.mismoDom ? ' checked' : '') + '><span><b>Entregar en el domicilio legal</b><br><span class="hint">' +
@@ -179,14 +189,11 @@
       }
       h += '</div>';
     });
-   if (req(D.nota)) {
-  h += '<div class="revb">' +
-    '<div class="revh">Nota / Información adicional</div>' +
-    '<p>' + esc(D.nota).replace(/\n/g, '<br>') + '</p>' +
-    '</div>';
-}
-
-return h + '</div><p class="legal">Al enviar, aceptás que Corti-Fer use estos datos para evaluar y gestionar tu cuenta.</p>';
+    if (req(D.nota)) {
+      h += '<div class="revb"><div class="revh">Nota / Información adicional<button type="button" data-goto="0">Editar</button></div>' +
+        '<p style="white-space:pre-wrap;margin:0">' + esc(D.nota) + '</p></div>';
+    }
+    return h + '</div><p class="legal">Al enviar, aceptás que Corti-Fer use estos datos para evaluar y gestionar tu cuenta.</p>';
   }
 
   /* ---------- Render ---------- */
@@ -230,7 +237,8 @@ return h + '</div><p class="legal">Al enviar, aceptás que Corti-Fer use estos d
   }
   const softCheck = (k) => { if (RULES[k]) setErr(k, RULES[k](D[k])); };
 
-  /* Avisos del CUIT (no impiden continuar): ya registrado y/o persona física. */
+  /* Aviso del CUIT (no impide continuar): solo persona física. El aviso de CUIT ya registrado
+     se hace únicamente en el panel de administración. */
   function cuitWarn() {
     const w = $('#w_cuit'); if (!w) return;
     const c = cuitDigits(), msgs = [];
@@ -339,9 +347,8 @@ return h + '</div><p class="legal">Al enviar, aceptás que Corti-Fer use estos d
       const files = {};
       for (const k of keys) files[k] = { name: FILES[k].name, mime: FILES[k].type, b64: await toB64(FILES[k]) };
       const data = A.normalize(D);
-data.nota = String(D.nota || '').trim().slice(0, 4000);
-
-const payload = { action: 'submit', reqId, data, files, hp: ($('#hp') || {}).value || '' };
+      data.nota = String(D.nota || '').replace(/\r\n?/g, '\n').trim().slice(0, MAX_NOTA);
+      const payload = { action: 'submit', reqId, data, files, hp: ($('#hp') || {}).value || '' };
 
       let r, lastErr;
       for (let intento = 1; intento <= 3; intento++) {
@@ -375,6 +382,7 @@ const payload = { action: 'submit', reqId, data, files, hp: ($('#hp') || {}).val
   form.addEventListener('input', (e) => {
     const t = e.target, k = t.dataset.k; if (!k) return;
     D[k] = t.type === 'checkbox' ? t.checked : t.value;
+    if (k === 'nota') { const c = $('#notaCount'); if (c) c.textContent = String(D.nota.length); }
     if (k === 'cuit') {
       t.value = D.cuit = A.fmtCuit(t.value);
       if (A.cuitOk(D.cuit)) { softCheck('cuit'); checkCuitSoon(); } else cuitWarn();
