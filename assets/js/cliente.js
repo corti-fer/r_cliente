@@ -117,7 +117,15 @@
       fld('domCalle', 'Calle y número', { ac: 'address-line1', max: 200 }) +
       fld('domCiudad', 'Ciudad', { ac: 'address-level2', span: 'c3', max: 200 }) +
       fld('domProv', 'Provincia', { type: 'select', opts: A.PROV, ac: 'address-level1', span: 'c3' }) +
-      fld('domCP', 'Código postal', { ac: 'postal-code', span: 'c2 keep', max: 8 }) + '</div>';
+      fld('domCP', 'Código postal', { ac: 'postal-code', span: 'c2 keep', max: 8 }) +
+'<div class="f c12" data-f="nota">' +
+  '<label for="nota">Nota / Información adicional <span class="opt">(opcional)</span></label>' +
+  '<textarea id="nota" data-k="nota" rows="4" maxlength="4000" ' +
+  'placeholder="Podés agregar cualquier información que consideres importante para tu solicitud.">' +
+  esc(D.nota || '') +
+  '</textarea>' +
+  '<span class="hint">Esta información será recibida por el equipo de administración de Corti-Fer.</span>' +
+'</div></div>';
 
     if (s === 1) return '<h2>Entrega de productos</h2><p class="lead">Dónde y cómo querés recibir tus pedidos.</p>' +
       '<label class="check"><input type="checkbox" id="mismoDom" data-k="mismoDom"' + (D.mismoDom ? ' checked' : '') + '><span><b>Entregar en el domicilio legal</b><br><span class="hint">' +
@@ -171,7 +179,14 @@
       }
       h += '</div>';
     });
-    return h + '</div><p class="legal">Al enviar, aceptás que Corti-Fer use estos datos para evaluar y gestionar tu cuenta de cliente.</p>';
+   if (req(D.nota)) {
+  h += '<div class="revb">' +
+    '<div class="revh">Nota / Información adicional</div>' +
+    '<p>' + esc(D.nota).replace(/\n/g, '<br>') + '</p>' +
+    '</div>';
+}
+
+return h + '</div><p class="legal">Al enviar, aceptás que Corti-Fer use estos datos para evaluar y gestionar tu cuenta.</p>';
   }
 
   /* ---------- Render ---------- */
@@ -324,7 +339,9 @@
       const files = {};
       for (const k of keys) files[k] = { name: FILES[k].name, mime: FILES[k].type, b64: await toB64(FILES[k]) };
       const data = A.normalize(D);
-      const payload = { action: 'submit', reqId, data, files, hp: ($('#hp') || {}).value || '' };
+data.nota = String(D.nota || '').trim().slice(0, 4000);
+
+const payload = { action: 'submit', reqId, data, files, hp: ($('#hp') || {}).value || '' };
 
       let r, lastErr;
       for (let intento = 1; intento <= 3; intento++) {
