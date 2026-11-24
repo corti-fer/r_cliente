@@ -45,6 +45,14 @@
 .file.has{border-style:solid;border-color:var(--ok);background:var(--ok-soft)}
 .file.has .name{color:var(--ink);font-weight:500}
 
+/* Nota / información adicional: campo grande, ocupa todo el ancho y respeta modo claro/oscuro */
+.f[data-f="nota"]{grid-column:1 / -1}
+.nota-area{display:block;width:100%;box-sizing:border-box;min-height:180px;padding:12px 14px;font:inherit;font-size:16px;line-height:1.5;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;resize:vertical}
+.nota-area::placeholder{color:var(--muted)}
+.nota-area:focus{outline:2px solid var(--brand);outline-offset:1px;border-color:var(--brand)}
+.f.bad .nota-area{border-color:var(--bad)}
+@media (max-width:560px){.nota-area{min-height:150px}}
+
 .nav{display:flex;justify-content:space-between;gap:10px;margin-top:26px;flex-wrap:wrap}
 .nav .r{margin-left:auto}
 .nav .btn.pri{min-width:180px}
@@ -61,6 +69,7 @@
 .revb{border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .revh{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--field);font-weight:700;border-left:4px solid var(--brand)}
 .revh button{border:0;background:none;color:var(--brand-text);cursor:pointer;font-weight:600;font-size:13px}
+.revb > p:not(.revempty){margin:0;padding:10px 14px;border-top:1px solid var(--line);overflow-wrap:anywhere}
 .revempty{margin:0;padding:10px 14px;color:var(--muted);border-top:1px solid var(--line)}
 dl.kv{margin:0;display:grid;grid-template-columns:minmax(110px,180px) 1fr}
 dl.kv dt,dl.kv dd{margin:0;padding:8px 14px;border-top:1px solid var(--line);min-width:0;overflow-wrap:anywhere}
