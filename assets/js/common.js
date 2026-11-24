@@ -67,6 +67,7 @@
     const m = !!D.mismoDom;
     const o = {
       razon: up(D.razon), fantasia: tr(D.fantasia),
+        nota: tr(D.nota || D.observaciones || D.infoAdicional),
       cuit: String(D.cuit || '').replace(/\D/g, ''),
       email: tr(D.email).toLowerCase(), vendedor: nombre(D.vendedor),
       movil: phone(D.movil), otroTel: phone(D.otroTel),
@@ -100,7 +101,20 @@
     };
     const fl = (k, need) => files[k] ? files[k] : (need ? 'Pendiente' : '');
     return [
-      { g: 'Datos del cliente', step: 0, r: [['Razón social', d.razon], ['Nombre de fantasía', d.fantasia], ['CUIT', d.cuit ? fmtCuit(d.cuit) : ''], ['Email', d.email], ['Teléfono móvil', d.movil], ['Otro teléfono', d.otroTel], ['Vendedor / viajante', d.vendedor]] },
+      {
+  g: 'Datos del cliente',
+  step: 0,
+  r: [
+    ['Razón social', d.razon],
+    ['Nombre de fantasía', d.fantasia],
+    ['CUIT', d.cuit ? fmtCuit(d.cuit) : ''],
+    ['Email', d.email],
+    ['Teléfono móvil', d.movil],
+    ['Otro teléfono', d.otroTel],
+    ['Vendedor / viajante', d.vendedor],
+    ['Nota del cliente', d.nota]
+  ]
+},
       { g: 'Domicilio legal', step: 0, r: [['Calle y número', d.domCalle], ['Ciudad', d.domCiudad], ['Provincia', d.domProv], ['Código postal', d.domCP]] },
       { g: 'Domicilio de entrega', step: 1, r: [['Calle y número', d.entCalle], ['Ciudad', d.entCiudad], ['Provincia', d.entProv], ['Código postal', d.entCP], ['Teléfono en destino', d.entTel], ['Transporte', d.transporte]] },
       { g: 'Referencias', step: 2, r: refs('Comercial', 'rn', 'rt', 'rc').concat(refs('Bancaria', 'bn', 'bt', 'bc')) },
